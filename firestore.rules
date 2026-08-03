@@ -1,0 +1,64 @@
+rules_version = '2';
+
+// ============================================================================
+// IELTS Prep Micro-Diagnostic — Firestore Security Rules
+// Deploy from project root:  firebase deploy --only firestore:rules
+// ============================================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---- users/{uid} : profile, credits, demo, progress counters ----------
+    // Read: owner only.
+    // Create: owner only, first-login, with default credits locked at 0.
+    // Update: DENIED. Credits/credits/demo/progress mutate only via Cloud
+    //         Functions (Task 3+) where server-side identity + bKash webhook
+    //         verification happen. lastActiveAt will also move to a Function.
+    match /users/{uid} {
+      allow read: if request.auth.uid == uid;
+
+      allow create: if request.auth.uid == uid
+        // Timestamp must be present (proves it's a first-login create, not a
+        // later overwrite).
+        && request.resource.data.createdAt != null
+        // Credits must be seeded at exactly 0 across all four modules —
+        // prevents a malicious client from self-granting credits at signup.
+        && request.resource.data.credits == {
+          reading: 0,
+          listening: 0,
+          writing: 0,
+          speaking: 0
+        };
+
+      // No client updates to the profile. All mutations go through Cloud Functions.
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    // ---- credits/{creditId} : credit-grant ledger (Task 3) ----------------
+    // Source of truth for every credit ever granted. Server-only writes.
+    // Owner can read their own ledger entries.
+    match /credits/{creditId} {
+      allow read: if request.auth.uid == resource.data.uid;
+      allow write: if false; // Cloud Functions only
+    }
+
+    // ---- paymentEvents/{txnId} : bKash webhook log (Task 3) ----------------
+    match /paymentEvents/{txnId} {
+      allow read, write: if false; // server-only (webhook endpoint + Functions)
+    }
+
+    // ---- testAttempts/{attemptId} : auto-saved test state (Task 5) ---------
+    match /testAttempts/{attemptId} {
+      allow read: if request.auth.uid == resource.data.uid;
+      // Task 5 will tighten update to "owner, only forward progress fields".
+      // For now, lock until the test engine exists.
+      allow write: if false;
+    }
+
+    // ---- Default deny ------------------------------------------------------
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

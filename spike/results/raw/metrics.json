@@ -1,0 +1,151 @@
+{
+  "validity": {
+    "totalRuns": 120,
+    "validRuns": 120,
+    "rate": 1,
+    "failures": []
+  },
+  "hallucination": {
+    "injected": 12,
+    "caught": 12,
+    "rate": 1,
+    "misses": []
+  },
+  "bandConsistency": {
+    "perSample": [
+      {
+        "sampleId": "W-weak-1",
+        "module": "writing",
+        "manual": 5,
+        "examinerMean": 5,
+        "gap": 0,
+        "validRuns": 10,
+        "flagged": false,
+        "flagReason": null
+      },
+      {
+        "sampleId": "W-weak-2",
+        "module": "writing",
+        "manual": 4.5,
+        "examinerMean": 5,
+        "gap": 0.5,
+        "validRuns": 10,
+        "flagged": false,
+        "flagReason": null
+      },
+      {
+        "sampleId": "W-mid-1",
+        "module": "writing",
+        "manual": 6,
+        "examinerMean": 6.4,
+        "gap": 0.4,
+        "validRuns": 10,
+        "flagged": false,
+        "flagReason": null
+      },
+      {
+        "sampleId": "W-mid-2",
+        "module": "writing",
+        "manual": 6.5,
+        "examinerMean": 5.9,
+        "gap": 0.6,
+        "validRuns": 10,
+        "flagged": false,
+        "flagReason": null
+      },
+      {
+        "sampleId": "W-strong-1",
+        "module": "writing",
+        "manual": 7.5,
+        "examinerMean": 8,
+        "gap": 0.5,
+        "validRuns": 10,
+        "flagged": false,
+        "flagReason": null
+      },
+      {
+        "sampleId": "W-strong-2",
+        "module": "writing",
+        "manual": 8,
+        "examinerMean": 8,
+        "gap": 0,
+        "validRuns": 10,
+        "flagged": false,
+        "flagReason": null
+      },
+      {
+        "sampleId": "S-weak-1",
+        "module": "speaking",
+        "manual": 5,
+        "examinerMean": 5,
+        "gap": 0,
+        "validRuns": 10,
+        "flagged": false,
+        "flagReason": null
+      },
+      {
+        "sampleId": "S-weak-2",
+        "module": "speaking",
+        "manual": 4.5,
+        "examinerMean": 5,
+        "gap": 0.5,
+        "validRuns": 10,
+        "flagged": false,
+        "flagReason": null
+      },
+      {
+        "sampleId": "S-mid-1",
+        "module": "speaking",
+        "manual": 6,
+        "examinerMean": 5.85,
+        "gap": 0.15,
+        "validRuns": 10,
+        "flagged": false,
+        "flagReason": null
+      },
+      {
+        "sampleId": "S-mid-2",
+        "module": "speaking",
+        "manual": 6.5,
+        "examinerMean": 6,
+        "gap": 0.5,
+        "validRuns": 10,
+        "flagged": false,
+        "flagReason": null
+      },
+      {
+        "sampleId": "S-strong-1",
+        "module": "speaking",
+        "manual": 7.5,
+        "examinerMean": 7.45,
+        "gap": 0.05,
+        "validRuns": 10,
+        "flagged": false,
+        "flagReason": null
+      },
+      {
+        "sampleId": "S-strong-2",
+        "module": "speaking",
+        "manual": 8,
+        "examinerMean": 8,
+        "gap": 0,
+        "validRuns": 10,
+        "flagged": false,
+        "flagReason": null
+      }
+    ],
+    "flaggedCount": 0
+  },
+  "latency": {
+    "examiner": {
+      "p50": 5068,
+      "p90": 6679,
+      "count": 120
+    },
+    "validator": {
+      "p50": 6962,
+      "p90": 9708,
+      "count": 12
+    }
+  }
+}

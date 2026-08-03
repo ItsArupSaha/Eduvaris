@@ -1,0 +1,20 @@
+{
+  "name": "ielts-grading-spike",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Task 1 — AI Grading Feasibility Spike (Examiner + Validator pipeline) for IELTS Prep Micro-Diagnostic",
+  "scripts": {
+    "spike": "tsx src/run.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "openai": "^4.67.3",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}
