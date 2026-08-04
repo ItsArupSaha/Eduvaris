@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { signInWithGoogle } from "@/lib/firebase/auth";
@@ -64,12 +65,12 @@ export default function LoginPage() {
         </p>
       </div>
 
-      <a
+      <Link
         href="/"
         className="mt-6 text-xs text-slate-500 hover:text-slate-700 underline underline-offset-2"
       >
         ← Back to landing
-      </a>
+      </Link>
     </main>
   );
 }

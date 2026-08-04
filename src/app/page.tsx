@@ -1,84 +1,54 @@
 "use client";
 
-import { useState } from "react";
-import { MangaChat } from "@/components/landing/MangaChat";
-import { HeroCTA } from "@/components/landing/HeroCTA";
+import { motion, useReducedMotion } from "framer-motion";
+import { Navbar } from "@/components/landing/Navbar";
+import { Footer } from "@/components/landing/Footer";
+import { AntiGravityBackground } from "@/components/landing/AntiGravityBackground";
+import { BookConversation } from "@/components/landing/BookConversation";
+import { ImpactSection } from "@/components/landing/ImpactSection";
 
 export default function LandingPage() {
-  const [ctaVisible, setCtaVisible] = useState(false);
-
   return (
-    <main className="flex-1 flex flex-col items-center justify-start px-4 py-12 md:py-16">
-      {/* Headline */}
-      <header className="text-center max-w-3xl mb-10">
-        <span className="inline-block rounded-full bg-indigo-50 border border-indigo-100 px-3 py-1 text-xs font-medium text-indigo-600 mb-4">
-          The Diagnostic MRI for English
-        </span>
-        <h1 className="text-3xl md:text-5xl font-bold tracking-tight text-slate-900 leading-tight">
-          Don&apos;t take another mock test.
-          <br />
-          <span className="text-indigo-600">Find your real weaknesses first.</span>
-        </h1>
-        <p className="mt-4 text-base md:text-lg text-slate-600 max-w-2xl mx-auto">
-          A 25-minute, 50 BDT micro-diagnostic that pinpoints your exact IELTS
-          strengths and root-cause weaknesses — backed by evidence from your own
-          performance.
-        </p>
-      </header>
+    <>
+      <Navbar />
+      <main className="flex-1 flex flex-col">
+        {/* ===== HERO — STRICT 100vh, NO BUTTONS OR TEXT, ONLY FLOATING WORDS & REALISTIC NOTEBOOK ===== */}
+        <section className="relative h-[calc(100vh-60px)] min-h-[500px] w-full flex items-center justify-center px-4 overflow-hidden bg-[#fffbeb]">
+          {/* Anti-gravity deep-colored keyword field (hero-only, continuous constant speed drift) */}
+          <AntiGravityBackground />
 
-      {/* Manga conversation */}
-      <MangaChat onComplete={() => setCtaVisible(true)} />
+          {/* Centerpiece: Fixed-size realistic notebook conversation */}
+          <div className="relative z-10 w-full flex justify-center items-center">
+            <BookConversation />
+          </div>
+        </section>
 
-      {/* CTA appears after conversation */}
-      <HeroCTA visible={ctaVisible} />
+        {/* ===== HEADLINE — directly below the 100vh hero ===== */}
+        <HeadlineSection />
 
-      {/* Value props */}
-      <section className="mt-20 grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl w-full">
-        <ValueCard
-          status="critical"
-          title="No Band Scores"
-          body="We never tell you 'You are Band 5.5.' We tell you: '🔴 You struggle with subject-verb agreement under pressure.'"
-        />
-        <ValueCard
-          status="emerging"
-          title="Eliminate Happy Guessing"
-          body="Guess-tracking, distractor traps, and proof mechanics expose weaknesses that mocks reward."
-        />
-        <ValueCard
-          status="strength"
-          title="Statistical Honesty"
-          body="Every diagnosis is tiered: Early Signal, Emerging Pattern, or Confirmed Pattern — never a guess."
-        />
-      </section>
-    </main>
+        {/* ===== IMPACT & DATA ===== */}
+        <ImpactSection />
+      </main>
+      <Footer />
+    </>
   );
 }
 
-function ValueCard({
-  status,
-  title,
-  body,
-}: {
-  status: "strength" | "emerging" | "critical";
-  title: string;
-  body: string;
-}) {
-  const accents = {
-    strength: { dot: "bg-emerald-500", label: "Strength" },
-    emerging: { dot: "bg-amber-500", label: "Emerging" },
-    critical: { dot: "bg-red-500", label: "Critical" },
-  }[status];
-
+function HeadlineSection() {
+  const prefersReducedMotion = useReducedMotion();
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-      <div className="flex items-center gap-2 mb-3">
-        <span className={`w-2.5 h-2.5 rounded-full ${accents.dot}`} />
-        <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">
-          {accents.label}
-        </span>
-      </div>
-      <h3 className="text-base font-semibold text-slate-900 mb-2">{title}</h3>
-      <p className="text-sm text-slate-600 leading-relaxed">{body}</p>
-    </div>
+    <section className="px-4 py-24 md:py-32 bg-amber-50 border-t border-amber-200/40">
+      <motion.h2
+        initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 20 }}
+        whileInView={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }}
+        viewport={{ once: true, amount: 0.5 }}
+        transition={{ duration: 0.6 }}
+        className="text-3xl md:text-5xl lg:text-6xl font-bold tracking-tight text-slate-800 leading-[1.1] max-w-4xl mx-auto text-center"
+      >
+        Don&apos;t take another mock test.
+        <br />
+        <span className="text-gradient">Find your real weaknesses first.</span>
+      </motion.h2>
+    </section>
   );
 }

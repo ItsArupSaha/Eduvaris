@@ -12,7 +12,6 @@ import {
   getDoc,
   setDoc,
   serverTimestamp,
-  updateDoc,
 } from "firebase/firestore";
 import { firebaseDb } from "./client";
 import { newUserProfile, type UserProfile } from "./user-types";

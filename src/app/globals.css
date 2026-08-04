@@ -1,31 +1,42 @@
 @import "tailwindcss";
 
 /*
- * Palette per spec Section 3 — soft slate/off-white bg, clear status accents.
- * Status colors: Emerald (strength), Amber (emerging), Red (critical).
+ * Warm academic theme per Task 2 UI spec.
+ * Font: Ubuntu (400/500/700) loaded via next/font in layout.tsx.
+ * Palette: amber-50 cream bg, slate-800 text, coral→orange gradient accents.
  */
 :root {
-  --background: #f8fafc; /* slate-50 — soft off-white */
-  --foreground: #0f172a; /* slate-900 */
+  --background: #fffbeb; /* amber-50 — warm cream */
+  --foreground: #1e293b; /* slate-800 — soft charcoal */
 
-  --status-strength: #10b981; /* emerald-500 */
-  --status-emerging: #f59e0b; /* amber-500 */
-  --status-critical: #ef4444; /* red-500 */
+  --accent-from: #f43f5e; /* rose-500 */
+  --accent-to: #f97316; /* orange-500 */
 
-  --accent: #4f46e5; /* indigo-600 — primary CTA */
+  /* Status colors preserved from product spec */
+  --status-strength: #10b981; /* emerald */
+  --status-emerging: #f59e0b; /* amber */
+  --status-critical: #ef4444; /* red */
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-ubuntu), Arial, Helvetica, sans-serif;
 }
 
+html,
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  font-family: var(--font-ubuntu), Arial, Helvetica, sans-serif;
+}
+
+/* Gradient text helper */
+.text-gradient {
+  background: linear-gradient(90deg, var(--accent-from), var(--accent-to));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 /* Respect reduced motion globally as a safety net (in addition to JS guards). */

@@ -74,7 +74,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
  * Anything that throws from the SDK call itself (not from caller-side JSON
  * parsing) is eligible for retry per isRetryable().
  */
-export async function withNetworkRetry<T>(
+export async function withNetworkRetry(
   client: OpenAI,
   params: OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming,
   opts: Partial<RetryOptions> = {}
