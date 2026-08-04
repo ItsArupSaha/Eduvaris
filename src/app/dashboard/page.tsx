@@ -1,20 +1,33 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signOut } from "@/lib/firebase/auth";
 import { useAuthStore } from "@/store/auth-store";
+import { MODULE_KEYS, type ModuleKey } from "@/lib/firebase/user-types";
+import {
+  usePendingRequests,
+  type ModuleRequestState,
+} from "@/hooks/usePendingRequests";
+
+/** Build the purchase URL with a pre-selected module. */
+function purchaseHref(m: ModuleKey): string {
+  return `/dashboard/purchase?module=${m}`;
+}
 
 /**
- * Task 2 dashboard STUB.
- * Proves the auth + profile flow end-to-end: shows the resolved user + profile,
- * and a sign-out button. Real dashboard (credits, module cards, disclaimer)
- * arrives in Task 4.
+ * Dashboard — real Task 4 UI.
+ *
+ * Shows the welcome header, a trademark disclaimer banner, and 4 module cards
+ * whose Locked/Unlocked state is driven reactively by `profile.credits` (kept
+ * live by the useUserCredits subscription wired into the dashboard layout).
  */
 export default function DashboardPage() {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const profile = useAuthStore((s) => s.profile);
   const reset = useAuthStore((s) => s.reset);
+  const { map: pendingMap } = usePendingRequests();
 
   async function handleSignOut() {
     await signOut();
@@ -23,73 +36,203 @@ export default function DashboardPage() {
   }
 
   return (
-    <main className="flex-1 flex flex-col items-center justify-start px-4 py-12">
-      <div className="w-full max-w-2xl">
-        <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
-          <div className="flex items-center gap-4 mb-6">
+    <main className="flex-1 px-4 py-10">
+      <div className="mx-auto w-full max-w-4xl">
+        {/* Welcome header */}
+        <header className="mb-6 flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
             {user?.photoURL ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={user.photoURL}
                 alt="Profile"
-                className="w-12 h-12 rounded-full border border-slate-200"
+                className="h-12 w-12 rounded-full border border-slate-200"
               />
             ) : (
-              <div className="w-12 h-12 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-semibold">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-amber-100 font-semibold text-amber-700">
                 {(user?.displayName ?? "?").charAt(0)}
               </div>
             )}
             <div>
-              <p className="text-xs text-slate-400 uppercase tracking-wide">Signed in as</p>
-              <h1 className="text-lg font-semibold text-slate-900">
-                {user?.displayName ?? "User"}
+              <p className="text-xs uppercase tracking-wide text-slate-400">
+                Welcome back
+              </p>
+              <h1 className="text-xl font-bold text-slate-900">
+                {user?.displayName ?? "Student"}
               </h1>
               <p className="text-sm text-slate-500">{user?.email}</p>
             </div>
           </div>
-
-          {/* Profile debug (Task 2 proof — replaced by real UI in Task 4) */}
-          <div className="rounded-xl bg-slate-50 border border-slate-100 p-4 mb-6">
-            <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">
-              Firestore profile (proof of Task 2 flow)
-            </p>
-            <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-              <dt className="text-slate-500">uid</dt>
-              <dd className="font-mono text-xs text-slate-700 truncate">{profile?.uid ?? "—"}</dd>
-              <dt className="text-slate-500">freeDemoUsed</dt>
-              <dd className="text-slate-700">{String(profile?.freeDemoUsed ?? "—")}</dd>
-              <dt className="text-slate-500">credits</dt>
-              <dd className="text-slate-700">{JSON.stringify(profile?.credits ?? {})}</dd>
-              <dt className="text-slate-500">createdAt</dt>
-              <dd className="text-slate-700 text-xs">
-                {profile?.createdAt
-                  ? new Date((profile.createdAt as { toMillis?: () => number }).toMillis?.() ?? 0).toLocaleString()
-                  : "—"}
-              </dd>
-            </dl>
-          </div>
-
-          <p className="text-xs text-slate-400 mb-6">
-            Full dashboard (module cards, credits, disclaimer) arrives in Task 4.
-          </p>
-
           <button
             type="button"
             onClick={handleSignOut}
-            className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors focus:outline-none focus-visible:ring-4 focus-visible:ring-indigo-200"
+            className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-amber-200"
           >
             Sign out
           </button>
+        </header>
+
+        {/* Disclaimer banner */}
+        <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <strong className="font-semibold">Disclaimer:</strong> Eduvaris is an
+          independent micro-diagnostic tool and is not affiliated with, endorsed
+          by, or connected to any official English proficiency exam body. Our
+          diagnostics are for learning purposes.
         </div>
 
-        <button
-          type="button"
-          onClick={() => router.push("/")}
-          className="mt-6 text-xs text-slate-500 hover:text-slate-700 underline underline-offset-2 block mx-auto"
-        >
-          ← Back to landing
-        </button>
+        {/* Section title */}
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-lg font-bold text-slate-900">Your modules</h2>
+          <Link
+            href="/dashboard/purchase"
+            className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-amber-600"
+          >
+            Buy a module
+          </Link>
+        </div>
+        <p className="mb-4 text-xs text-slate-400">
+          Each module is a separate 50 BDT attempt. One payment unlocks one
+          attempt at that module only.
+        </p>
+
+        {/* Module grid */}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {MODULE_KEYS.map((m) => (
+            <ModuleCard
+              key={m}
+              moduleKey={m}
+              credits={profile?.credits?.[m] ?? 0}
+              requestState={pendingMap[m] ?? "none"}
+            />
+          ))}
+        </div>
+
+        {/* Footer debug line (small, keeps Task 2 proof reachable) */}
+        <p className="mt-8 text-center text-xs text-slate-400">
+          uid: <span className="font-mono">{profile?.uid ?? "—"}</span>
+        </p>
       </div>
     </main>
+  );
+}
+
+/* ----------------------------- Module card ------------------------------ */
+
+const MODULE_META: Record<
+  ModuleKey,
+  { title: string; duration: string; blurb: string }
+> = {
+  reading: {
+    title: "Reading",
+    duration: "25–30 min",
+    blurb: "Detail scanning, T/F/NG logic, paraphrase inference.",
+  },
+  listening: {
+    title: "Listening",
+    duration: "25–30 min",
+    blurb: "Map labelling, accent tolerance, detail capture.",
+  },
+  writing: {
+    title: "Writing",
+    duration: "25 min",
+    blurb: "Structural grammar, task response, coherence.",
+  },
+  speaking: {
+    title: "Speaking",
+    duration: "15–20 min",
+    blurb: "Fluency, lexical range, pronunciation drift.",
+  },
+};
+
+function ModuleCard({
+  moduleKey,
+  credits,
+  requestState,
+}: {
+  moduleKey: ModuleKey;
+  credits: number;
+  requestState: ModuleRequestState;
+}) {
+  const meta = MODULE_META[moduleKey];
+  const locked = credits <= 0;
+
+  // Card visual + status badge depend on which of four states we're in:
+  //   unlocked   → credits > 0
+  //   pending    → locked AND a payment request is awaiting admin approval
+  //   rejected   → locked AND the last request was rejected (allow retry)
+  //   locked     → locked, no notable request yet
+  const isPending = locked && requestState === "pending";
+  const isRejected = locked && requestState === "rejected";
+
+  const cardClass = !locked
+    ? "border-emerald-200 bg-white"
+    : isPending
+    ? "border-amber-300 bg-amber-50/40"
+    : isRejected
+    ? "border-rose-200 bg-rose-50/40"
+    : "border-slate-200 bg-slate-50";
+
+  return (
+    <div
+      className={`relative overflow-hidden rounded-2xl border p-5 shadow-sm transition-colors ${cardClass}`}
+    >
+      <div className="flex items-start justify-between">
+        <div>
+          <h3 className="text-base font-bold text-slate-900">{meta.title}</h3>
+          <p className="text-xs text-slate-500">{meta.duration}</p>
+        </div>
+        {!locked ? (
+          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+            ✓ {credits} attempt{credits > 1 ? "s" : ""}
+          </span>
+        ) : isPending ? (
+          <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-700">
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-amber-500" />
+            Verifying
+          </span>
+        ) : isRejected ? (
+          <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2.5 py-1 text-xs font-semibold text-rose-700">
+            Rejected
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1 rounded-full bg-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-600">
+            🔒 Locked
+          </span>
+        )}
+      </div>
+
+      <p className="mt-3 text-sm text-slate-600">{meta.blurb}</p>
+
+      <div className="mt-4">
+        {!locked ? (
+          <button
+            type="button"
+            disabled
+            title="Diagnostic engine arrives in Task 5"
+            className="block w-full cursor-not-allowed rounded-lg bg-emerald-100 px-4 py-2 text-center text-sm font-semibold text-emerald-700 opacity-70"
+          >
+            Start diagnostic (soon)
+          </button>
+        ) : isPending ? (
+          <div className="block w-full rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-center text-sm font-medium text-amber-700">
+            Waiting for approval…
+          </div>
+        ) : isRejected ? (
+          <Link
+            href={purchaseHref(moduleKey)}
+            className="block w-full rounded-lg border border-rose-300 bg-white px-4 py-2 text-center text-sm font-semibold text-rose-700 hover:bg-rose-50"
+          >
+            Try again
+          </Link>
+        ) : (
+          <Link
+            href={purchaseHref(moduleKey)}
+            className="block w-full rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-center text-sm font-semibold text-amber-700 hover:bg-amber-100"
+          >
+            Unlock for 50 BDT
+          </Link>
+        )}
+      </div>
+    </div>
   );
 }

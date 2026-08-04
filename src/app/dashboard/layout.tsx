@@ -1,13 +1,17 @@
 "use client";
 
 import { useRequireAuth } from "@/hooks/useRequireAuth";
+import { useUserCredits } from "@/hooks/useUserCredits";
 
 /**
- * Dashboard layout — applies the soft client route guard.
- * Real dashboard UI (credits, modules, disclaimer) is Task 4.
+ * Dashboard layout — applies the soft client route guard and starts the live
+ * profile/credits subscription so admin-approved payments reflect here without
+ * a page refresh.
  */
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { ready } = useRequireAuth();
+  // Live profile subscription — keeps credits reactive after admin approval.
+  useUserCredits();
 
   if (!ready) {
     return (

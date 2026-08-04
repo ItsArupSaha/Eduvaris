@@ -40,12 +40,24 @@ service cloud.firestore {
     // Owner can read their own ledger entries.
     match /credits/{creditId} {
       allow read: if request.auth.uid == resource.data.uid;
-      allow write: if false; // Cloud Functions only
+      allow write: if false; // server-only (Route Handlers via firebase-admin)
     }
 
-    // ---- paymentEvents/{txnId} : bKash webhook log (Task 3) ----------------
-    match /paymentEvents/{txnId} {
-      allow read, write: if false; // server-only (webhook endpoint + Functions)
+    // ---- paymentRequests/{requestId} : bKash manual verification (Task 3) --
+    // Owner reads their own requests (purchase UI live-status via onSnapshot).
+    // Admins read the queue via Route Handlers (server SDK bypasses rules).
+    // Creates + updates are server-only.
+    match /paymentRequests/{requestId} {
+      allow read: if request.auth.uid == resource.data.uid;
+      allow write: if false; // server-only (Route Handlers)
+    }
+
+    // ---- usedTrxIds/{trxId} : idempotency lock (Task 3) -------------------
+    // Doc id == normalized bKash TrxID. Create-only inside the approval txn =
+    // Firestore's only native unique constraint. Prevents double-credit from
+    // duplicate submissions or concurrent admin approvals.
+    match /usedTrxIds/{trxId} {
+      allow read, write: if false; // server-only (approval transaction)
     }
 
     // ---- testAttempts/{attemptId} : auto-saved test state (Task 5) ---------

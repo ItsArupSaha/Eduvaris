@@ -43,16 +43,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Dedupe: strict mode + re-render could fire this twice for the same uid.
       if (inFlightFor.current !== fbUser.uid) {
         inFlightFor.current = fbUser.uid;
-        try {
-          const profile = await getOrCreateUserDoc({
-            uid: fbUser.uid,
-            email: fbUser.email ?? "",
-            displayName: fbUser.displayName ?? "",
-            photoURL: fbUser.photoURL ?? "",
-          });
-          setProfile(profile);
-        } catch (err) {
-          setError(err instanceof Error ? err.message : "Failed to load user profile.");
+        // Retry the server-side profile init a few times — a transient network
+        // blip shouldn't leave a logged-in user without a profile doc (which
+        // would later break credit grants).
+        let lastErr: unknown = null;
+        for (let attempt = 0; attempt < 3; attempt++) {
+          try {
+            const profile = await getOrCreateUserDoc({
+              uid: fbUser.uid,
+              email: fbUser.email ?? "",
+              displayName: fbUser.displayName ?? "",
+              photoURL: fbUser.photoURL ?? "",
+            });
+            setProfile(profile);
+            lastErr = null;
+            break;
+          } catch (err) {
+            lastErr = err;
+            // Exponential-ish backoff: 500ms, 1s, then give up.
+            if (attempt < 2) await new Promise((r) => setTimeout(r, 500 * (attempt + 1)));
+          }
+        }
+        if (lastErr) {
+          setError(
+            lastErr instanceof Error
+              ? lastErr.message
+              : "Failed to load user profile."
+          );
         }
       }
       setLoading(false);

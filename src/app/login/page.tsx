@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { signInWithGoogle } from "@/lib/firebase/auth";
 import { useAuthStore } from "@/store/auth-store";
 
@@ -14,18 +14,19 @@ export default function LoginPage() {
   const [busy, setBusy] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
 
-  // Already signed in → bounce to dashboard.
-  if (!loading && user) {
-    router.replace("/dashboard");
-  }
+  // Already signed in → bounce to dashboard. Must run in an effect, not during
+  // render: calling router.replace during render throws and loops.
+  useEffect(() => {
+    if (!loading && user) router.replace("/dashboard");
+  }, [loading, user, router]);
 
   async function handleGoogle() {
     setBusy(true);
     setLocalError(null);
     try {
       await signInWithGoogle();
-      // onAuthStateChanged in AuthProvider will set the store + redirect.
-      router.replace("/dashboard");
+      // onAuthStateChanged in AuthProvider will set the store; the redirect is
+      // handled there so we avoid a double-push race here.
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Google sign-in failed.";
       setLocalError(msg);
