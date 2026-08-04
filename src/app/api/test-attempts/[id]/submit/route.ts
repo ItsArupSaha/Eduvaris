@@ -1,0 +1,162 @@
+/**
+ * POST /api/test-attempts/[id]/submit
+ *
+ * Finalizes an attempt: grades it deterministically, sets status to completed
+ * (or expired if the deadline already passed), detaches the attempt id from
+ * the user's inProgressAttemptIds, and bumps completedAttemptCount.
+ *
+ * Idempotent: submitting an already-finalized attempt returns its existing
+ * grade instead of erroring. This is what makes the resume-on-expiry path
+ * safe — the client may call submit after the server already finalized.
+ *
+ * Reason is captured so we can distinguish "user clicked submit" from
+ * "timer ran out" from "page revisited after expiry".
+ */
+import { NextResponse } from "next/server";
+import { FieldValue, Timestamp } from "firebase-admin/firestore";
+import { adminDb } from "@/lib/firebase/admin";
+import { requireUser } from "@/lib/auth/admin-guard";
+import { gradeExam } from "@/lib/exam/grader";
+import { getExamForm } from "@/lib/exam/exam-forms";
+import type { TestAttempt } from "@/lib/exam/attempt-types";
+
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
+interface SubmitBody {
+  reason?: unknown;
+}
+
+export async function POST(
+  request: Request,
+  ctx: { params: Promise<{ id: string }> }
+) {
+  const auth = await requireUser(request);
+  if (!auth.ok) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status });
+  }
+  const uid = auth.decoded!.uid;
+  const { id } = await ctx.params;
+
+  // Body is optional — submit may be called with no payload.
+  let reason = "user-submit";
+  try {
+    const body = (await request.clone().json().catch(() => ({}))) as SubmitBody;
+    if (typeof body.reason === "string" && body.reason.length <= 32) {
+      reason = body.reason;
+    }
+  } catch {
+    // keep default reason
+  }
+
+  const db = adminDb();
+  const ref = db.doc(`testAttempts/${id}`);
+
+  // Pre-read for fast-fail (ownership + existence). The transaction re-reads
+  // for correctness, but failing fast here avoids the txn cost on bad ids.
+  const preSnap = await ref.get();
+  if (!preSnap.exists) {
+    return NextResponse.json({ error: "Attempt not found." }, { status: 404 });
+  }
+  const preData = preSnap.data() as TestAttempt;
+  if (preData.uid !== uid) {
+    return NextResponse.json({ error: "Attempt not found." }, { status: 404 });
+  }
+
+  // Already finalized → return the existing grade (idempotent).
+  if (preData.status !== "in-progress") {
+    return NextResponse.json({
+      attemptId: id,
+      status: preData.status,
+      grade: preData.grade,
+      alreadyFinalized: true,
+    });
+  }
+
+  // Resolve the exam form for this attempt. Old attempts grade against their
+  // own version's key; a missing form is a server-side content regression.
+  const exam = getExamForm(preData.examId, preData.module);
+  if (!exam) {
+    console.error(
+      `[submit] unknown exam form ${preData.examId}@v${preData.examVersion} for attempt ${id}`
+    );
+    return NextResponse.json(
+      { error: "Exam content form unavailable. Contact support." },
+      { status: 500 }
+    );
+  }
+
+  const userRef = db.doc(`users/${uid}`);
+
+  try {
+    // Compute grade OUTSIDE the txn — pure function over immutable content +
+    // the snapshot of answers. The txn then only does the finalize writes.
+    const nowMs = Date.now();
+    const expiresMs =
+      preData.expiresAt instanceof Timestamp
+        ? (preData.expiresAt as Timestamp).toMillis()
+        : 0;
+    const expiredByClock = expiresMs > 0 && nowMs > expiresMs;
+    const finalStatus = expiredByClock ? "expired" : "completed";
+    const grade = gradeExam(
+      exam,
+      preData.answers ?? {},
+      nowMs,
+      preData.reviewSnapshot ?? null
+    );
+
+    await db.runTransaction(async (txn) => {
+      // Re-read inside the txn so we don't finalize twice on a race.
+      const snap = await txn.get(ref);
+      if (!snap.exists) {
+        throw new TransactionError(404, "Attempt not found.");
+      }
+      const data = snap.data() as TestAttempt;
+      if (data.uid !== uid) {
+        throw new TransactionError(404, "Attempt not found.");
+      }
+      if (data.status !== "in-progress") {
+        // Lost the race. Re-grade from the stored state to keep the response
+        // honest, but perform NO writes.
+        return;
+      }
+
+      txn.update(ref, {
+        status: finalStatus,
+        completedAt: FieldValue.serverTimestamp(),
+        grade,
+        // answers may have advanced since preSnap (last autosave). We accept
+        // whatever the latest stored answers are — the client's last PATCH
+        // is the source of truth for inputs.
+      });
+
+      // Detach from in-progress list + bump the completed counter.
+      txn.update(userRef, {
+        inProgressAttemptIds: FieldValue.arrayRemove(id),
+        completedAttemptCount: FieldValue.increment(1),
+      });
+    });
+
+    return NextResponse.json({
+      attemptId: id,
+      status: finalStatus,
+      grade,
+      reason,
+    });
+  } catch (err) {
+    if (err instanceof TransactionError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
+    const why = err instanceof Error ? err.message : String(err);
+    console.error("[submit] unexpected error:", why, err);
+    return NextResponse.json({ error: `Server error: ${why}` }, { status: 500 });
+  }
+}
+
+/** Internal error type carrying an HTTP status out of the transaction. */
+class TransactionError extends Error {
+  constructor(public status: number, message: string) {
+    super(message);
+    this.name = "TransactionError";
+  }
+}

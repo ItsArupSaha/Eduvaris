@@ -9,6 +9,7 @@ import {
   usePendingRequests,
   type ModuleRequestState,
 } from "@/hooks/usePendingRequests";
+import { useStartExam } from "@/hooks/useStartExam";
 
 /** Build the purchase URL with a pre-selected module. */
 function purchaseHref(m: ModuleKey): string {
@@ -205,14 +206,18 @@ function ModuleCard({
 
       <div className="mt-4">
         {!locked ? (
-          <button
-            type="button"
-            disabled
-            title="Diagnostic engine arrives in Task 5"
-            className="block w-full cursor-not-allowed rounded-lg bg-emerald-100 px-4 py-2 text-center text-sm font-semibold text-emerald-700 opacity-70"
-          >
-            Start diagnostic (soon)
-          </button>
+          moduleKey === "reading" || moduleKey === "listening" ? (
+            <StartButton moduleKey={moduleKey} />
+          ) : (
+            <button
+              type="button"
+              disabled
+              title="This module's diagnostic isn't built yet."
+              className="block w-full cursor-not-allowed rounded-lg bg-emerald-100 px-4 py-2 text-center text-sm font-semibold text-emerald-700 opacity-70"
+            >
+              Coming soon
+            </button>
+          )
         ) : isPending ? (
           <div className="block w-full rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-center text-sm font-medium text-amber-700">
             Waiting for approval…
@@ -233,6 +238,31 @@ function ModuleCard({
           </Link>
         )}
       </div>
+    </div>
+  );
+}
+
+/**
+ * Start button for a built module. Calls useStartExam, which hits the
+ * resume-first server route — clicking this repeatedly never burns a second
+ * credit. The route always returns the single in-progress attempt id, so the
+ * user lands on the same exam whether they click once or five times.
+ */
+function StartButton({ moduleKey }: { moduleKey: "reading" | "listening" }) {
+  const { start, loading, error } = useStartExam(moduleKey);
+  return (
+    <div className="block w-full">
+      <button
+        type="button"
+        onClick={start}
+        disabled={loading}
+        className="block w-full rounded-lg bg-emerald-600 px-4 py-2 text-center text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        {loading ? "Starting…" : "Start diagnostic"}
+      </button>
+      {error && (
+        <p className="mt-1.5 text-center text-xs text-rose-600">{error}</p>
+      )}
     </div>
   );
 }

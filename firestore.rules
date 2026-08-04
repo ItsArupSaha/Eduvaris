@@ -60,12 +60,14 @@ service cloud.firestore {
       allow read, write: if false; // server-only (approval transaction)
     }
 
-    // ---- testAttempts/{attemptId} : auto-saved test state (Task 5) ---------
+    // ---- testAttempts/{attemptId} : in-progress / finalized exam state ------
+    // Owner reads (hydrate on resume, view results). Server-only writes via
+    // Route Handlers: POST /start creates, PATCH /[id] saves forward-progress
+    // fields only, POST /submit finalizes + grades. The client NEVER writes
+    // this doc — that is the anti-cheat foundation (server owns all inputs).
     match /testAttempts/{attemptId} {
       allow read: if request.auth.uid == resource.data.uid;
-      // Task 5 will tighten update to "owner, only forward progress fields".
-      // For now, lock until the test engine exists.
-      allow write: if false;
+      allow write: if false; // server-only (Route Handlers via firebase-admin)
     }
 
     // ---- Default deny ------------------------------------------------------
