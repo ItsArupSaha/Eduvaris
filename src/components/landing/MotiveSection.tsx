@@ -61,7 +61,7 @@ export function MotiveSection() {
                     Without a diagnosis
                   </p>
                   <p className="text-3xl font-bold text-slate-800">
-                    20,000<span className="text-sm font-medium text-slate-500 ml-1">BDT</span>
+                    21,000<span className="text-sm font-medium text-slate-500 ml-1">BDT</span>
                   </p>
                   <p className="text-sm text-slate-500 mt-1">
                     Real exam + blind prep, not knowing what to fix

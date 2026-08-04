@@ -23,17 +23,18 @@ interface Line {
 
 const SCRIPT: Line[] = [
   // Left page (5 messages — fills the left page completely)
-  { speaker: "Arif", text: "Sadia, are you ready for your IELTS exam next month?", page: "left" },
+  { speaker: "Arif", text: "Sadia, are you preparing for your IELTS exam next month?", page: "left" },
   { speaker: "Sadia", text: "Not really, Arif. I keep taking mock tests but my score is stuck at 6.0.", page: "left" },
   { speaker: "Arif", text: "Mock tests only give you a score. They don't show your actual weaknesses.", page: "left" },
   { speaker: "Sadia", text: "What do you mean? I know I'm getting a 6.0.", page: "left" },
-  { speaker: "Arif", text: "A 6.0 doesn't tell you why. Are you failing T/F/NG? Or struggling with synonyms?", page: "left" },
+  { speaker: "Arif", text: "A 6.0 doesn't tell you how to improve. Are you struggling with T/F/NG? Or lacking synonyms?", page: "left" },
 
   // Right page (4 messages — fills the right page)
   { speaker: "Sadia", text: "I have no idea... I usually just guess the answers I don't know.", page: "right" },
   { speaker: "Arif", text: "Exactly! That's 'Happy Guessing.' You need a Deep Diagnostic of your English first.", page: "right" },
   { speaker: "Sadia", text: "A Deep Diagnostic? For English?", page: "right" },
-  { speaker: "Arif", text: "Yes! A 50tk test that exposes your true root causes before you waste 20k BDT on real exam.", page: "right" },
+  { speaker: "Arif", text: "Yes! A 50tk test that exposes your root weaknesses before you waste 21k BDT on the real exam!", page: "right" },
+  { speaker: "Sadia", text: "Wow, I didn't know something like that existed. I really need to find out why I'm stuck at 6.0. How do I start?", page: "right" },
 ];
 
 const REVEAL_MS = 2400;     // Time between individual message reveals
