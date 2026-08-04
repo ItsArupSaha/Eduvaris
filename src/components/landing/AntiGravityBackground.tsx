@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, useMotionValue, useSpring, useReducedMotion, type MotionValue } from "framer-motion";
 
 /**
@@ -184,6 +184,10 @@ function FloatingWord({ word, baseX, baseY, style, containerRef, mouse }: WordPr
 export function AntiGravityBackground() {
   const containerRef = useRef<HTMLDivElement>(null);
   const prefersReducedMotion = useReducedMotion();
+  // Render only on the client so floating-word positions are computed once,
+  // post-hydration — eliminates any server/client mismatch.
+  const [isMounted, setIsMounted] = useState(false);
+  useEffect(() => setIsMounted(true), []);
 
   const mouseX = useMotionValue(-9999);
   const mouseY = useMotionValue(-9999);
@@ -254,17 +258,18 @@ export function AntiGravityBackground() {
       className="absolute inset-0 overflow-hidden pointer-events-none select-none"
       aria-hidden
     >
-      {layout.map((item, i) => (
-        <FloatingWord
-          key={item.word + i}
-          word={item.word}
-          baseX={item.x}
-          baseY={item.y}
-          style={item.style}
-          containerRef={containerRef}
-          mouse={mouse}
-        />
-      ))}
+      {isMounted &&
+        layout.map((item, i) => (
+          <FloatingWord
+            key={item.word + i}
+            word={item.word}
+            baseX={item.x}
+            baseY={item.y}
+            style={item.style}
+            containerRef={containerRef}
+            mouse={mouse}
+          />
+        ))}
     </div>
   );
 }

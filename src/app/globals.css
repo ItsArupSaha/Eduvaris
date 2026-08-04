@@ -31,6 +31,10 @@ body {
   font-family: var(--font-ubuntu), Arial, Helvetica, sans-serif;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 /* Gradient text helper */
 .text-gradient {
   background: linear-gradient(90deg, var(--accent-from), var(--accent-to));
