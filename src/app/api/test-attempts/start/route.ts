@@ -44,16 +44,21 @@ export async function POST(request: Request) {
   }
   const uid = auth.decoded!.uid;
 
-  // 2. Parse + validate body. Only reading + listening ship in this build.
+  // 2. Parse + validate body. All four modules ship in this build.
   let body: StartRequestBody;
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
   }
-  if (body.module !== "reading" && body.module !== "listening") {
+  if (
+    body.module !== "reading" &&
+    body.module !== "listening" &&
+    body.module !== "writing" &&
+    body.module !== "speaking"
+  ) {
     return NextResponse.json(
-      { error: "Only reading and listening modules are available in this build." },
+      { error: "Unknown module." },
       { status: 400 }
     );
   }

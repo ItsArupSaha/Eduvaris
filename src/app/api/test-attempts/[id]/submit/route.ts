@@ -18,6 +18,7 @@ import { adminDb } from "@/lib/firebase/admin";
 import { requireUser } from "@/lib/auth/admin-guard";
 import { gradeExam } from "@/lib/exam/grader";
 import { getExamForm } from "@/lib/exam/exam-forms";
+import { transcribeSpeakingAudios } from "@/lib/exam/whisper";
 import type { TestAttempt } from "@/lib/exam/attempt-types";
 
 export const dynamic = "force-dynamic";
@@ -98,11 +99,33 @@ export async function POST(
         : 0;
     const expiredByClock = expiresMs > 0 && nowMs > expiresMs;
     const finalStatus = expiredByClock ? "expired" : "completed";
-    const grade = gradeExam(
-      exam,
-      preData.answers ?? {},
-      nowMs
-    );
+    const answers = preData.answers ?? {};
+    const grade = gradeExam(exam, answers, nowMs);
+
+    // Speaking module: transcribe all captured audios via Whisper BEFORE the
+    // txn. This is the slow network step (up to 11 audios in parallel) so it
+    // must run outside the txn to avoid holding locks. Failures resolve to ""
+    // per-question rather than throwing — one bad audio can't block finalize.
+    // If OPENAI_API_KEY is unset we skip gracefully (transcripts just stay
+    // empty); the deterministic grade still lands.
+    let transcripts: Record<string, string> = {};
+    if (preData.module === "speaking" && process.env.OPENAI_API_KEY) {
+      try {
+        transcripts = await transcribeSpeakingAudios(exam, answers);
+        console.info(
+          `[submit] whisper transcribed ${Object.keys(transcripts).length} audios for attempt ${id}`
+        );
+      } catch (err) {
+        // Log + continue — transcription is best-effort, not finalize-blocking.
+        const why = err instanceof Error ? err.message : String(err);
+        console.error(
+          `[submit] whisper transcription failed for attempt ${id}:`,
+          why,
+          err
+        );
+        transcripts = {};
+      }
+    }
 
     await db.runTransaction(async (txn) => {
       // Re-read inside the txn so we don't finalize twice on a race.
@@ -124,6 +147,7 @@ export async function POST(
         status: finalStatus,
         completedAt: FieldValue.serverTimestamp(),
         grade,
+        transcripts,
         // answers may have advanced since preSnap (last autosave). We accept
         // whatever the latest stored answers are — the client's last PATCH
         // is the source of truth for inputs.

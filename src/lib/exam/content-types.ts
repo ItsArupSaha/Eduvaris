@@ -21,7 +21,14 @@ export type StationKind =
   | "distractor" // listening
   | "audioFill" // listening
   | "sentenceComplete" // listening
-  | "inference"; // listening — advanced implicit-meaning / speaker-attitude
+  | "inference" // listening — advanced implicit-meaning / speaker-attitude
+  | "paraphrase" // writing
+  | "cohesion" // writing
+  | "bodyParagraph" // writing
+  | "imageFluency" // speaking
+  | "rapidFire" // speaking — Part 1 audio-examiner questions
+  | "cueCard" // speaking
+  | "abstractAnswer"; // speaking
 
 /** T/F/NG verdicts (reading Station 3). */
 export type TfngVerdict = "true" | "false" | "not_given";
@@ -204,6 +211,192 @@ export interface InferenceStation {
   questions: InferenceQuestion[];
 }
 
+/* -------------------------------- WRITING -------------------------------- */
+
+/**
+ * Writing Station 1 — Paraphrasing.
+ *
+ * 3 distinct IELTS-style prompts shown one by one. Per-question budget (2 min
+ * each). The student rewrites the prompt in 1-2 sentences WITHOUT using the
+ * listed banned words. Free-text answer; AI-graded later (Task 10).
+ */
+export interface ParaphraseQuestion extends BaseQuestion {
+  kind: "paraphrase";
+  prompt: string;
+  bannedWords: string[];
+  /** Per-question time budget in seconds (e.g. 120 for 2 min). */
+  perQuestionSeconds: number;
+}
+export interface ParaphraseStation {
+  kind: "paraphrase";
+  id: "paraphrase";
+  title: string;
+  instructions: string;
+  questions: ParaphraseQuestion[];
+}
+
+/**
+ * Writing Station 2 — Cohesion Builder.
+ *
+ * A scrambled body paragraph. The student:
+ *   1. Drag-and-drops the sentences into a logical order.
+ *   2. Drags a transition-word "chip" into the gap between two sentences (or
+ *      leaves it in the unused tray) — testing where, not just which.
+ *
+ * Deterministic grading:
+ *   - orderedIndices must equal correctOrder
+ *   - the placed transition's option index must equal correctTransition
+ *   - the gap it's placed in must equal correctTransitionGap
+ *
+ * Gap indices: 0 = before sentence 1, 1 = between sentences 1-2, ...,
+ * n = after the last sentence. -1 = unused tray (not placed).
+ */
+export interface CohesionQuestion extends BaseQuestion {
+  kind: "cohesion";
+  /** Sentences in SCRAMBLED display order (ids are stable; order is the input). */
+  scrambledSentences: string[];
+  /** The correct sentence order, as indices into scrambledSentences. */
+  correctOrder: number[];
+  /** Candidate transition words shown as draggable chips. */
+  transitionOptions: string[];
+  /** The index into transitionOptions of the correct transition. */
+  correctTransition: number;
+  /** The gap index (0..correctOrder.length) where the transition belongs. */
+  correctTransitionGap: number;
+}
+export interface CohesionStation {
+  kind: "cohesion";
+  id: "cohesion";
+  title: string;
+  instructions: string;
+  questions: CohesionQuestion[];
+}
+
+/**
+ * Writing Station 3 — Pressure Production.
+ *
+ * One IELTS prompt; the student writes a single body paragraph (min 100
+ * words) under time pressure. Live word counter. Free-text answer; AI-graded
+ * later (Task 10).
+ */
+export interface BodyParagraphQuestion extends BaseQuestion {
+  kind: "bodyParagraph";
+  prompt: string;
+  minWords: number;
+}
+export interface BodyParagraphStation {
+  kind: "bodyParagraph";
+  id: "bodyParagraph";
+  title: string;
+  instructions: string;
+  questions: BodyParagraphQuestion[];
+}
+
+/* -------------------------------- SPEAKING ------------------------------- */
+
+/**
+ * Speaking Station 1 — Spontaneous Fluency.
+ *
+ * 3 images shown one by one. 15-second analysis countdown, then up to 60
+ * seconds of speaking. Audio is captured by the MediaRecorder API (universal
+ * browser support), uploaded to Firebase Storage on Lock & Next, and
+ * transcribed server-side by Whisper on submit. Smart cut-off (Lock & Next
+ * button) if the student finishes early.
+ */
+export interface ImageFluencyQuestion extends BaseQuestion {
+  kind: "imageFluency";
+  imageSrc: string;
+  /** Silent analysis countdown before the mic opens. */
+  analysisSeconds: number;
+  /** Max speak time before auto cut-off. */
+  speakSeconds: number;
+}
+export interface ImageFluencyStation {
+  kind: "imageFluency";
+  id: "imageFluency";
+  title: string;
+  instructions: string;
+  questions: ImageFluencyQuestion[];
+}
+
+/**
+ * Speaking Station 1B — Rapid-Fire Audio Questions (Part 1).
+ *
+ * 3 standard IELTS Part 1 questions, one by one. The app acts as examiner:
+ * for each question it auto-plays an audio clip of the examiner asking it,
+ * then reveals a "Start Speaking" button. The student has `answerSeconds`
+ * (default 30) to answer. Smart cut-off via Lock & Next.
+ *
+ * Audio is captured by the MediaRecorder API but NOT shown to the student as
+ * text; it's transcribed by Whisper on submit.
+ */
+export interface RapidFireQuestion extends BaseQuestion {
+  kind: "rapidFire";
+  question: string;
+  /** Examiner audio clip (auto-played). Path under /public. */
+  examinerAudioSrc: string;
+  answerSeconds: number;
+}
+export interface RapidFireStation {
+  kind: "rapidFire";
+  id: "rapidFire";
+  title: string;
+  instructions: string;
+  questions: RapidFireQuestion[];
+}
+
+/**
+ * Speaking Station 2 — Narrative Tense Control (Part 2 cue card).
+ *
+ * A standard IELTS Part 2 cue card. 1 min prep (silent countdown), then 2
+ * min speaking. When prep ends, a short audio cue ("Now begin speaking") is
+ * auto-played and the mic opens automatically — the student must speak for
+ * the full `speakSeconds` (no smart cut-off) to test endurance. Audio is
+ * captured by the MediaRecorder API, transcribed by Whisper on submit; no
+ * live text is shown.
+ */
+export interface CueCardQuestion extends BaseQuestion {
+  kind: "cueCard";
+  /** Cue card prompt parts (topic + bullet prompts). */
+  topic: string;
+  prompts: string[];
+  prepSeconds: number;
+  speakSeconds: number;
+  /** Auto-played "Now begin speaking" cue after prep. Path under /public. */
+  startCueSrc: string;
+}
+export interface CueCardStation {
+  kind: "cueCard";
+  id: "cueCard";
+  title: string;
+  instructions: string;
+  questions: CueCardQuestion[];
+}
+
+/**
+ * Speaking Station 3 — Abstract Articulation.
+ *
+ * 4 abstract Part 3 questions, one by one. The app auto-plays an examiner
+ * audio clip of each question, then reveals a "Start Speaking" button. The
+ * student has `answerSeconds` (default 90) to answer. Smart cut-off via
+ * Lock & Next. Audio captured by MediaRecorder, transcribed by Whisper on
+ * submit; no live text shown.
+ */
+export interface AbstractAnswerQuestion extends BaseQuestion {
+  kind: "abstractAnswer";
+  question: string;
+  /** Examiner audio clip (auto-played). Path under /public. */
+  examinerAudioSrc: string;
+  answerSeconds: number;
+}
+export interface AbstractAnswerStation {
+  kind: "abstractAnswer";
+  id: "abstractAnswer";
+  title: string;
+  instructions: string;
+  questions: AbstractAnswerQuestion[];
+}
+
 /* ----------------------------- Station union ----------------------------- */
 
 export type AnyStation =
@@ -214,7 +407,14 @@ export type AnyStation =
   | DistractorStation
   | AudioFillStation
   | SentenceCompleteStation
-  | InferenceStation;
+  | InferenceStation
+  | ParaphraseStation
+  | CohesionStation
+  | BodyParagraphStation
+  | ImageFluencyStation
+  | RapidFireStation
+  | CueCardStation
+  | AbstractAnswerStation;
 
 /** Any question, any module. Used by the grader's flatten helper. */
 export type AnyQuestion =
@@ -225,7 +425,14 @@ export type AnyQuestion =
   | DistractorQuestion
   | AudioFillQuestion
   | SentenceCompleteQuestion
-  | InferenceQuestion;
+  | InferenceQuestion
+  | ParaphraseQuestion
+  | CohesionQuestion
+  | BodyParagraphQuestion
+  | ImageFluencyQuestion
+  | RapidFireQuestion
+  | CueCardQuestion
+  | AbstractAnswerQuestion;
 
 /** A whole exam form (reading or listening). */
 export interface ExamForm {
@@ -251,6 +458,23 @@ export interface ListeningExam extends ExamForm {
     AudioFillStation,
     SentenceCompleteStation,
     InferenceStation
+  ];
+}
+
+/** Writing-shaped form. */
+export interface WritingExam extends ExamForm {
+  module: "writing";
+  stations: [ParaphraseStation, CohesionStation, BodyParagraphStation];
+}
+
+/** Speaking-shaped form. */
+export interface SpeakingExam extends ExamForm {
+  module: "speaking";
+  stations: [
+    ImageFluencyStation,
+    RapidFireStation,
+    CueCardStation,
+    AbstractAnswerStation
   ];
 }
 

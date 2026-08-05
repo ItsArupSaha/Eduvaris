@@ -46,7 +46,7 @@ export interface StartAttemptResponse {
 }
 
 export function startAttempt(
-  module: "reading" | "listening"
+  module: "reading" | "listening" | "writing" | "speaking"
 ): Promise<StartAttemptResponse> {
   return apiFetch<StartAttemptResponse>("/api/test-attempts/start", {
     method: "POST",

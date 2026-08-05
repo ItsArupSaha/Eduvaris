@@ -75,18 +75,50 @@ export interface ExamState {
   lockTfngProof: (stationId: string, questionId: string, proofSentenceIndex: number) => void;
   timeoutTfng: (stationId: string, questionId: string) => void;
 
-  /** Fill-blank for scan/audioFill/sentenceComplete. */
+  /** Fill-blank + free-text Writing answers. */
   setText: (
     stationId: string,
     questionId: string,
     text: string,
-    kind: "scan" | "audioFill" | "sentenceComplete"
+    kind:
+      | "scan"
+      | "audioFill"
+      | "sentenceComplete"
+      | "paraphrase"
+      | "bodyParagraph"
   ) => void;
-  /** Lock a fill-blank answer. */
+  /** Lock a fill-blank / free-text Writing answer. */
   lockText: (
     stationId: string,
     questionId: string,
-    kind: "scan" | "audioFill" | "sentenceComplete"
+    kind:
+      | "scan"
+      | "audioFill"
+      | "sentenceComplete"
+      | "paraphrase"
+      | "bodyParagraph"
+  ) => void;
+  /** Speaking: set the uploaded Storage path for a recorded answer. */
+  setAudioPath: (
+    stationId: string,
+    questionId: string,
+    audioPath: string,
+    kind: "imageFluency" | "rapidFire" | "cueCard" | "abstractAnswer"
+  ) => void;
+  /** Speaking: lock a recorded answer. */
+  lockAudio: (
+    stationId: string,
+    questionId: string,
+    kind: "imageFluency" | "rapidFire" | "cueCard" | "abstractAnswer"
+  ) => void;
+
+  /** Cohesion station: set the sentence order + transition placement. */
+  setCohesion: (
+    stationId: string,
+    questionId: string,
+    orderedIndices: number[],
+    transitionOption: number,
+    transitionPlacement: number
   ) => void;
 
   /** Mark a question as played (audio-once enforcement). */
@@ -285,6 +317,58 @@ export const useExamStore = create<ExamState>((set, get) => ({
     void kind;
   },
 
+  setAudioPath: (stationId, questionId, audioPath, kind) => {
+    const key = answerKey(stationId, questionId);
+    const existing = get().answers[key];
+    set({
+      answers: {
+        ...get().answers,
+        [key]: makeRecord({ kind, audioPath }, existing),
+      },
+      dirty: true,
+    });
+  },
+
+  lockAudio: (stationId, questionId, kind) => {
+    const key = answerKey(stationId, questionId);
+    const existing = get().answers[key];
+    if (!existing || existing.locked) return;
+    set({
+      answers: {
+        ...get().answers,
+        [key]: { ...existing, locked: true, lockedAt: now() },
+      },
+      dirty: true,
+    });
+    void kind;
+  },
+
+  setCohesion: (
+    stationId,
+    questionId,
+    orderedIndices,
+    transitionOption,
+    transitionPlacement
+  ) => {
+    const key = answerKey(stationId, questionId);
+    const existing = get().answers[key];
+    set({
+      answers: {
+        ...get().answers,
+        [key]: makeRecord(
+          {
+            kind: "cohesion",
+            orderedIndices,
+            transitionOption,
+            transitionPlacement,
+          },
+          existing
+        ),
+      },
+      dirty: true,
+    });
+  },
+
   markPlayed: (stationId, questionId) => {
     // Played-state is derived from answer presence for distractor (option
     // selection implies the audio was played). For other audio stations we
@@ -339,7 +423,21 @@ function placeholderPayload(kind: string): AnswerPayload {
     case "scan":
     case "audioFill":
     case "sentenceComplete":
+    case "paraphrase":
+    case "bodyParagraph":
       return { kind, text: "" };
+    case "imageFluency":
+    case "rapidFire":
+    case "cueCard":
+    case "abstractAnswer":
+      return { kind, audioPath: "" };
+    case "cohesion":
+      return {
+        kind: "cohesion",
+        orderedIndices: [],
+        transitionOption: -1,
+        transitionPlacement: -1,
+      };
     default:
       return { kind: "scan", text: "" };
   }

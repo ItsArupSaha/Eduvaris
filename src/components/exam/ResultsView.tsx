@@ -13,6 +13,12 @@ import type {
   SkimStation,
   SynonymStation,
   InferenceStation,
+  ParaphraseStation,
+  CohesionStation,
+  BodyParagraphStation,
+  RapidFireStation,
+  CueCardStation,
+  AbstractAnswerStation,
 } from "@/lib/exam/content-types";
 
 /**
@@ -250,6 +256,66 @@ function RevealRow({
       transcript = s.transcript;
       break;
     }
+    case "paraphrase": {
+      const s = station as ParaphraseStation;
+      const sq = s.questions.find((x) => x.id === q.id)!;
+      label = `Paraphrase: "${sq.prompt}"`;
+      correctText = "(AI-graded in full report)";
+      userText = userFillText(userAnswer);
+      break;
+    }
+    case "cohesion": {
+      const s = station as CohesionStation;
+      const sq = s.questions.find((x) => x.id === q.id)!;
+      label = "Sentence order + transition placement";
+      correctText = `Order: ${sq.correctOrder
+        .map((i) => i + 1)
+        .join(" → ")} · Transition: "${sq.transitionOptions[sq.correctTransition]}" in gap ${sq.correctTransitionGap}`;
+      userText = userCohesionText(
+        userAnswer,
+        sq.transitionOptions,
+        sq.scrambledSentences
+      );
+      break;
+    }
+    case "bodyParagraph": {
+      const s = station as BodyParagraphStation;
+      const sq = s.questions.find((x) => x.id === q.id)!;
+      label = `Body paragraph (min ${sq.minWords} words)`;
+      correctText = "(AI-graded in full report)";
+      userText = userFillText(userAnswer);
+      break;
+    }
+    case "imageFluency": {
+      label = "Spoken description (audio saved for AI grading)";
+      correctText = "(AI-graded in full report)";
+      userText = userAudioText(userAnswer);
+      break;
+    }
+    case "rapidFire": {
+      const s = station as RapidFireStation;
+      const sq = s.questions.find((x) => x.id === q.id)!;
+      label = `Examiner: "${sq.question}"`;
+      correctText = "(AI-graded in full report)";
+      userText = userAudioText(userAnswer);
+      break;
+    }
+    case "cueCard": {
+      const s = station as CueCardStation;
+      const sq = s.questions.find((x) => x.id === q.id)!;
+      label = `Cue card: "${sq.topic}"`;
+      correctText = "(AI-graded in full report)";
+      userText = userAudioText(userAnswer);
+      break;
+    }
+    case "abstractAnswer": {
+      const s = station as AbstractAnswerStation;
+      const sq = s.questions.find((x) => x.id === q.id)!;
+      label = `Examiner: "${sq.question}"`;
+      correctText = "(AI-graded in full report)";
+      userText = userAudioText(userAnswer);
+      break;
+    }
   }
 
   const border = correct
@@ -345,6 +411,58 @@ function userFillText(userAnswer: unknown): string {
   ) {
     const t = (userAnswer as { text: string }).text;
     if (typeof t === "string" && t.trim()) return t;
+  }
+  return "(no answer)";
+}
+
+/** Speaking answers carry an uploaded audioPath, not text. */
+function userAudioText(userAnswer: unknown): string {
+  if (
+    userAnswer &&
+    typeof userAnswer === "object" &&
+    "audioPath" in (userAnswer as Record<string, unknown>)
+  ) {
+    const p = (userAnswer as { audioPath: string }).audioPath;
+    if (typeof p === "string" && p.trim()) return "Recorded ✓";
+  }
+  return "(no answer)";
+}
+
+function userCohesionText(
+  userAnswer: unknown,
+  transitionOptions: string[],
+  sentences: string[]
+): string {
+  if (
+    userAnswer &&
+    typeof userAnswer === "object" &&
+    "orderedIndices" in (userAnswer as Record<string, unknown>)
+  ) {
+    const ua = userAnswer as {
+      orderedIndices: number[];
+      transitionOption: number;
+      transitionPlacement: number;
+    };
+    if (!Array.isArray(ua.orderedIndices) || ua.orderedIndices.length === 0) {
+      return "(no order)";
+    }
+    // Render the assembled paragraph with the transition chip inserted.
+    const parts: string[] = [];
+    for (let pos = 0; pos < ua.orderedIndices.length; pos++) {
+      const gapBefore = pos;
+      if (ua.transitionPlacement === gapBefore && ua.transitionOption >= 0) {
+        parts.push(`[${transitionOptions[ua.transitionOption]}]`);
+      }
+      parts.push(sentences[ua.orderedIndices[pos]] ?? "?");
+    }
+    // Trailing gap (after last sentence).
+    if (
+      ua.transitionPlacement === ua.orderedIndices.length &&
+      ua.transitionOption >= 0
+    ) {
+      parts.push(`[${transitionOptions[ua.transitionOption]}]`);
+    }
+    return parts.join(" / ");
   }
   return "(no answer)";
 }

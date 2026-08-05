@@ -13,7 +13,9 @@ import { startAttempt } from "@/lib/exam/exam-api";
  *
  * Exposes `loading` + `error` so the caller can render a button state.
  */
-export function useStartExam(moduleKey: "reading" | "listening") {
+export function useStartExam(
+  moduleKey: "reading" | "listening" | "writing" | "speaking"
+) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

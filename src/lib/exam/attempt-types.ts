@@ -24,6 +24,12 @@ export type AttemptStatus = (typeof ATTEMPT_STATUSES)[number];
 /**
  * Discriminated union of per-question answer payloads across all modules.
  * `kind` matches the question kind in content-types.ts.
+ *
+ * Speaking answers store a Storage object path (`audioPath`) captured by the
+ * MediaRecorder API — universal browser support. The raw audio is uploaded to
+ * Firebase Storage server-side via a Route Handler (storage rules stay
+ * default-deny). On submit, the backend fetches each audio, runs Whisper, and
+ * writes the resulting text into `TestAttempt.transcripts[key]`.
  */
 export type AnswerPayload =
   | { kind: "skim"; optionIndex: number }
@@ -37,7 +43,23 @@ export type AnswerPayload =
   | { kind: "distractor"; optionIndex: number }
   | { kind: "audioFill"; text: string }
   | { kind: "sentenceComplete"; text: string }
-  | { kind: "inference"; optionIndex: number };
+  | { kind: "inference"; optionIndex: number }
+  | { kind: "paraphrase"; text: string }
+  | {
+      kind: "cohesion";
+      /** Student's sentence order, as indices into scrambledSentences. */
+      orderedIndices: number[];
+      /** Index into transitionOptions of the placed chip, or -1 if unused. */
+      transitionOption: number;
+      /** Gap index where the chip is placed, or -1 if in the unused tray. */
+      transitionPlacement: number;
+    }
+  | { kind: "bodyParagraph"; text: string }
+  /** Speaking: audio captured by MediaRecorder, uploaded to Storage. */
+  | { kind: "imageFluency"; audioPath: string }
+  | { kind: "rapidFire"; audioPath: string }
+  | { kind: "cueCard"; audioPath: string }
+  | { kind: "abstractAnswer"; audioPath: string };
 
 /**
  * One answer record. Keyed by `${stationId}.${questionId}` in `answers`.
@@ -88,6 +110,12 @@ export interface TestAttempt {
   tabSwitchCount: number;
   creditsConsumed: number;
   grade: Grade | null;
+  /**
+   * Whisper transcripts for speaking answers. Keyed by `${stationId}.${questionId}`.
+   * Filled server-side on submit (speaking module only). Empty/absent for
+   * reading/listening/writing.
+   */
+  transcripts?: Record<string, string>;
 }
 
 /** The forward-progress fields the PATCH route is allowed to merge. */

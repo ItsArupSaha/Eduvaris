@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="480" viewBox="0 0 640 480">
+  <rect width="640" height="480" fill="#dbeafe"/>
+  <rect x="40" y="40" width="560" height="400" rx="16" fill="#bfdbfe" stroke="#93c5fd" stroke-width="2"/>
+  <path d="M40 320 Q 200 260 320 300 T 600 280 L 600 400 L 40 400 Z" fill="#60a5fa"/>
+  <path d="M40 340 Q 200 290 320 320 T 600 310 L 600 400 L 40 400 Z" fill="#3b82f6"/>
+  <rect x="280" y="220" width="80" height="100" rx="8" fill="#1e40af"/>
+  <polygon points="320,180 360,220 280,220" fill="#1e3a8a"/>
+  <text x="320" y="430" text-anchor="middle" font-family="sans-serif" font-size="16" fill="#1e3a8a">Speaking prompt 3 — placeholder image</text>
+</svg>

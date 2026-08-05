@@ -78,11 +78,17 @@ export function PlayOnceAudio({
   segmentStart,
   segmentEnd,
   disabled,
+  autoPlay = false,
+  onPlayed,
 }: {
   src: string;
   segmentStart?: number;
   segmentEnd?: number;
   disabled?: boolean;
+  /** Auto-play on mount (used for examiner-question audio). */
+  autoPlay?: boolean;
+  /** Fired once when playback finishes naturally (or segment ends). */
+  onPlayed?: () => void;
 }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [played, setPlayed] = useState(false);
@@ -93,10 +99,14 @@ export function PlayOnceAudio({
   const { playingSrc } = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
   const anotherIsPlaying = playingSrc !== null && playingSrc !== src;
 
-  // Reset play-state when `src` changes. Makes the component safe under React
-  // reuse and prevents a stuck played/playing flag from disabling a fresh
-  // clip.
-  useEffect(() => {
+  // Reset play-state when `src` changes. Adjusting state during render against
+  // a previous-value ref — React's blessed pattern for "reset when a prop
+  // changes" (avoids setState-in-effect cascades).
+  // https://react.dev/reference/react/useState#storing-information-from-previous-renders
+  /* eslint-disable react-hooks/refs */
+  const prevSrcRef = useRef(src);
+  if (prevSrcRef.current !== src) {
+    prevSrcRef.current = src;
     const a = audioRef.current;
     if (a) {
       a.pause();
@@ -104,7 +114,8 @@ export function PlayOnceAudio({
     }
     setPlayed(false);
     setPlaying(false);
-  }, [src]);
+  }
+  /* eslint-enable react-hooks/refs */
 
   // Release the global lock if we unmount mid-play (route away, station
   // advance). The lock must not stay held forever on an orphaned instance.
@@ -130,10 +141,29 @@ export function PlayOnceAudio({
     }
   };
 
+  // Auto-play on mount (used for examiner-question audio). Wrapped in
+  // handlePlay so the global play-lock + error handling apply uniformly.
+  // onPlayedRef avoids re-running the effect when the callback identity
+  // changes (we only want it to fire on `src` change).
+  const onPlayedRef = useRef(onPlayed);
+  useEffect(() => {
+    onPlayedRef.current = onPlayed;
+  });
+  useEffect(() => {
+    if (!autoPlay) return;
+    // Auto-play is a legitimate external-system sync (start audio on mount /
+    // src change). handlePlay's setState calls happen async in the audio play
+    // promise, not synchronously in this effect body.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void handlePlay();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoPlay, src]);
+
   const finish = () => {
     setPlaying(false);
     setPlayed(true);
     releasePlay(src);
+    onPlayedRef.current?.();
   };
 
   const handleTimeUpdate = () => {

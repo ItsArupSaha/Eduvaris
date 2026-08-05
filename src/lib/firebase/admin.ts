@@ -21,6 +21,7 @@ import {
 } from "firebase-admin/app";
 import { getAuth, type Auth as AdminAuth } from "firebase-admin/auth";
 import { getFirestore, type Firestore as AdminFirestore } from "firebase-admin/firestore";
+import { getStorage, type Storage as AdminStorage } from "firebase-admin/storage";
 
 const serviceAccount = {
   projectId: process.env.FIREBASE_PROJECT_ID,
@@ -43,12 +44,34 @@ function assertServiceAccount(): void {
 
 let _app: AdminApp | null = null;
 
+/**
+ * Resolve the Storage bucket name.
+ *
+ * Modern Firebase projects (created after Oct 2024) use the
+ * `{projectId}.firebasestorage.app` format. Legacy projects use
+ * `{projectId}.appspot.com`. We prefer an explicit override env var, then
+ * the modern format. We resolve this lazily on every call rather than once
+ * at init() so a dev-server hot-reload that re-creates the default app
+ * doesn't lose the bucket binding.
+ */
+export function storageBucketName(): string {
+  return (
+    process.env.FIREBASE_STORAGE_BUCKET ??
+    `${process.env.FIREBASE_PROJECT_ID}.firebasestorage.app`
+  );
+}
+
 /** Lazy initializer — runs once per server process. */
 function init(): AdminApp {
   if (_app) return _app;
   assertServiceAccount();
-  // Reuse existing app across hot-reloads in dev.
-  _app = getApps().length ? getApps()[0]! : initializeApp({ credential: cert(serviceAccount) });
+  // Reuse existing app across hot-reloads in dev. The Storage bucket is
+  // pinned here too, but callers should prefer adminStorage().bucket() which
+  // resolves it lazily to survive re-init edge cases.
+  _app = getApps().length ? getApps()[0]! : initializeApp({
+    credential: cert(serviceAccount),
+    storageBucket: storageBucketName(),
+  });
   return _app;
 }
 
@@ -62,4 +85,14 @@ export function adminAuth(): AdminAuth {
 
 export function adminDb(): AdminFirestore {
   return getFirestore(init());
+}
+
+/**
+ * Default Cloud Storage bucket handle. Used by the speaking-audio upload and
+ * Whisper transcription paths. The bucket name is resolved lazily on every
+ * call (not cached at init) so we survive hot-reloads that re-init the app
+ * without the storageBucket option.
+ */
+export function adminStorage(): AdminStorage {
+  return getStorage(init());
 }

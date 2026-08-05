@@ -11,6 +11,14 @@
  *   sentenceComplete              — text must equal one of
  *                                    [answer, ...acceptAlternatives] after
  *                                    normalization. Typos fail. Spelling counts.
+ *   cohesion                       — ordered indices equal correctOrder AND
+ *                                    transition index equals correctTransition.
+ *
+ * Writing (paraphrase, bodyParagraph) and Speaking (imageFluency, cueCard,
+ * abstractAnswer) answers are FREE TEXT captured for AI grading in Task 10.
+ * The deterministic grader marks them as "submitted" (correct = text is
+ * non-empty) so the fraction reflects completion, not quality. Task 10 will
+ * replace this with the Examiner+Validator AI grading.
  */
 import type {
   AnyStation,
@@ -23,6 +31,13 @@ import type {
   AudioFillQuestion,
   SentenceCompleteQuestion,
   InferenceQuestion,
+  CohesionQuestion,
+  ParaphraseQuestion,
+  BodyParagraphQuestion,
+  ImageFluencyQuestion,
+  RapidFireQuestion,
+  CueCardQuestion,
+  AbstractAnswerQuestion,
 } from "./content-types";
 import type {
   AnswerPayload,
@@ -63,7 +78,14 @@ function gradeQuestion(
     | DistractorQuestion
     | AudioFillQuestion
     | SentenceCompleteQuestion
-    | InferenceQuestion,
+    | InferenceQuestion
+  | CohesionQuestion
+  | ParaphraseQuestion
+  | BodyParagraphQuestion
+  | ImageFluencyQuestion
+  | RapidFireQuestion
+  | CueCardQuestion
+  | AbstractAnswerQuestion,
   answers: AnswersMap
 ): boolean {
   const key = answerKey(stationId, q.id);
@@ -88,6 +110,33 @@ function gradeQuestion(
       );
       return accepted.includes(norm);
     }
+    case "cohesion": {
+      if (p.kind !== "cohesion") return false;
+      const orderMatch =
+        (p.orderedIndices?.length ?? 0) === q.correctOrder.length &&
+        p.orderedIndices.every((idx, i) => idx === q.correctOrder[i]);
+      const transitionMatch =
+        p.transitionOption === q.correctTransition &&
+        p.transitionPlacement === q.correctTransitionGap;
+      return orderMatch && transitionMatch;
+    }
+    // ---- Writing: free text, placeholder grading (Task 10) ----
+    case "paraphrase":
+    case "bodyParagraph":
+      // Mark as "correct" (submitted) if non-empty text was captured. Real
+      // quality grading is the AI Examiner in Task 10.
+      return p.kind === q.kind && !!p.text && p.text.trim().length > 0;
+    // ---- Speaking: audio uploaded, placeholder grading (Task 10) ----
+    case "imageFluency":
+    case "rapidFire":
+    case "cueCard":
+    case "abstractAnswer":
+      // Mark as "correct" (submitted) if a non-empty Storage path exists. The
+      // Whisper transcript + AI Examiner in Task 10 supply real quality.
+      // Optional chaining guards against legacy {kind,text} payloads from
+      // the Web Speech API era — they grade as "not submitted", which is
+      // honest for incompatible old data.
+      return p.kind === q.kind && !!p.audioPath && p.audioPath.length > 0;
   }
 }
 

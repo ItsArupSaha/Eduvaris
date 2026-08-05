@@ -206,7 +206,10 @@ function ModuleCard({
 
       <div className="mt-4">
         {!locked ? (
-          moduleKey === "reading" || moduleKey === "listening" ? (
+          moduleKey === "reading" ||
+          moduleKey === "listening" ||
+          moduleKey === "writing" ||
+          moduleKey === "speaking" ? (
             <StartButton moduleKey={moduleKey} />
           ) : (
             <button
@@ -248,8 +251,13 @@ function ModuleCard({
  * credit. The route always returns the single in-progress attempt id, so the
  * user lands on the same exam whether they click once or five times.
  */
-function StartButton({ moduleKey }: { moduleKey: "reading" | "listening" }) {
+function StartButton({
+  moduleKey,
+}: {
+  moduleKey: "reading" | "listening" | "writing" | "speaking";
+}) {
   const { start, loading, error } = useStartExam(moduleKey);
+
   return (
     <div className="block w-full">
       <button

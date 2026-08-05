@@ -108,6 +108,10 @@ export async function PATCH(
     patch.stationIndex = body.stationIndex;
   }
 
+  // `cohesion` answers carry nested arrays/numbers — they're valid forward-
+  // progress inputs, so we accept the whole answers map as-is (already done
+  // above). No special handling needed here.
+
   if (body.answers !== undefined) {
     // The client posts its full answers map. We accept it as-is — it only
     // contains user inputs, never a grade. Field shape is validated lightly

@@ -14,11 +14,15 @@ import type { ExamForm } from "./content-types";
 import type { ModuleKey } from "@/lib/firebase/user-types";
 import { READING_V1 } from "./reading/reading-v1";
 import { LISTENING_V1 } from "./listening/listening-v1";
+import { WRITING_V1 } from "./writing/writing-v1";
+import { SPEAKING_V1 } from "./speaking/speaking-v1";
 
 /** All registered forms keyed by id. */
 const FORMS: Record<string, ExamForm> = {
   [READING_V1.id]: READING_V1,
   [LISTENING_V1.id]: LISTENING_V1,
+  [WRITING_V1.id]: WRITING_V1,
+  [SPEAKING_V1.id]: SPEAKING_V1,
 };
 
 /**
