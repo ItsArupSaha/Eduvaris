@@ -73,7 +73,6 @@ export interface HydratedAttempt {
   tabSwitchCount: number;
   expiresAtMs: number | null;
   grade: Grade | null;
-  reviewSnapshot: AnswersMap | null;
 }
 
 export function hydrateAttempt(id: string): Promise<{ attempt: HydratedAttempt }> {
@@ -86,7 +85,6 @@ export interface SavePatch {
   stationIndex?: number;
   answers?: AnswersMap;
   tabSwitchCount?: number;
-  reviewSnapshot?: AnswersMap;
 }
 
 export function saveAttempt(id: string, patch: SavePatch): Promise<{ savedAt: number }> {

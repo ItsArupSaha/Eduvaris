@@ -163,7 +163,6 @@ export async function POST(request: Request) {
         tabSwitchCount: 0,
         creditsConsumed: 1,
         grade: null,
-        reviewSnapshot: null,
       };
 
       txn.set(newAttemptRef, attemptDoc);

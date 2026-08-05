@@ -63,37 +63,34 @@ export interface ExamState {
 
   touchQuestion: (stationId: string, questionId: string) => void;
 
-  /** MCQ selection for skim/synonym/distractor. */
+  /** MCQ selection for skim/synonym/distractor/inference. */
   setOption: (
     stationId: string,
     questionId: string,
     optionIndex: number,
-    kind: "skim" | "synonym" | "distractor"
+    kind: "skim" | "synonym" | "distractor" | "inference"
   ) => void;
 
   setTfngVerdict: (stationId: string, questionId: string, verdict: TfngVerdict) => void;
   lockTfngProof: (stationId: string, questionId: string, proofSentenceIndex: number) => void;
   timeoutTfng: (stationId: string, questionId: string) => void;
 
-  /** Fill-blank for scan/audioFill/sentenceComplete/replay. */
+  /** Fill-blank for scan/audioFill/sentenceComplete. */
   setText: (
     stationId: string,
     questionId: string,
     text: string,
-    kind: "scan" | "audioFill" | "sentenceComplete" | "replay"
+    kind: "scan" | "audioFill" | "sentenceComplete"
   ) => void;
   /** Lock a fill-blank answer. */
   lockText: (
     stationId: string,
     questionId: string,
-    kind: "scan" | "audioFill" | "sentenceComplete" | "replay"
+    kind: "scan" | "audioFill" | "sentenceComplete"
   ) => void;
 
   /** Mark a question as played (audio-once enforcement). */
   markPlayed: (stationId: string, questionId: string) => void;
-
-  /** Snapshot current answers for replay change-tracking. */
-  snapshotReview: () => void;
 
   registerTabSwitch: () => void;
 
@@ -297,16 +294,6 @@ export const useExamStore = create<ExamState>((set, get) => ({
     void questionId;
   },
 
-  snapshotReview: () =>
-    set((s) => ({
-      // Stash a deep copy keyed the same as `answers`. The autosave route
-      // accepts reviewSnapshot as a forward-progress field.
-      // We only snapshot once.
-      dirty: true,
-      // Stash is performed via setText above; the snapshot itself is captured
-      // by the Review component through its own effect that reads answers.
-    })),
-
   registerTabSwitch: () =>
     set((s) => ({ tabSwitchCount: s.tabSwitchCount + 1, dirty: true })),
 
@@ -345,13 +332,13 @@ function placeholderPayload(kind: string): AnswerPayload {
     case "skim":
     case "synonym":
     case "distractor":
+    case "inference":
       return { kind, optionIndex: -1 };
     case "tfng":
       return { kind: "tfng", verdict: null, proofSentenceIndex: null };
     case "scan":
     case "audioFill":
     case "sentenceComplete":
-    case "replay":
       return { kind, text: "" };
     default:
       return { kind: "scan", text: "" };

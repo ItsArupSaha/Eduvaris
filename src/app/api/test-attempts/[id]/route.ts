@@ -84,7 +84,6 @@ export async function PATCH(
     stationIndex?: unknown;
     answers?: unknown;
     tabSwitchCount?: unknown;
-    reviewSnapshot?: unknown;
   };
   try {
     body = await request.json();
@@ -117,17 +116,6 @@ export async function PATCH(
       return NextResponse.json({ error: "answers must be an object." }, { status: 400 });
     }
     patch.answers = body.answers as AnswersMap;
-  }
-
-  if (body.reviewSnapshot !== undefined) {
-    // Listening review snapshot — plain answers map, captured at review start.
-    if (body.reviewSnapshot !== null && !isPlainObject(body.reviewSnapshot)) {
-      return NextResponse.json(
-        { error: "reviewSnapshot must be an object or null." },
-        { status: 400 }
-      );
-    }
-    patch.reviewSnapshot = body.reviewSnapshot as AnswersMap | null;
   }
 
   if (body.tabSwitchCount !== undefined) {

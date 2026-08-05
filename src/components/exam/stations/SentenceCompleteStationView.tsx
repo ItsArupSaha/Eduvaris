@@ -8,13 +8,12 @@ import { PlayOnceAudio } from "./PlayOnceAudio";
 /**
  * Station 3 — Paraphrase Logic.
  *
- * One academic clip (played once). Three sentence-completion questions whose
- * stems paraphrase the spoken content; the student types the exact word/short
+ * One academic clip (played once). Sentence-completion questions whose stems
+ * paraphrase the spoken content; the student types the exact word/short
  * phrase. Same normalization as scan/audioFill.
  *
- * The transcript is NOT shown — it appears in Station 4 (Replay) for review.
- * This is intentional: Station 3 tests listening + inference, Station 4 lets
- * the student verify against bounded replays.
+ * The transcript is NOT shown during the attempt — only on results. This
+ * station tests listening + paraphrase inference.
  */
 export function SentenceCompleteStationView({
   station,
@@ -29,7 +28,7 @@ export function SentenceCompleteStationView({
       <h2 className="mb-1 text-lg font-bold text-slate-900">{station.title}</h2>
       <p className="mb-5 text-sm text-slate-500">
         Listen to the talk once. Complete each sentence with the exact word or
-        phrase. You can review these in the next station.
+        short phrase the speaker uses.
       </p>
 
       <div className="mb-6 rounded-xl border border-slate-200 bg-white p-4">

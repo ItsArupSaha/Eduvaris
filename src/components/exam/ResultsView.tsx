@@ -8,11 +8,11 @@ import type {
   AudioFillStation,
   DistractorStation,
   ProofStation,
-  ReplayStation,
   ScanStation,
   SentenceCompleteStation,
   SkimStation,
   SynonymStation,
+  InferenceStation,
 } from "@/lib/exam/content-types";
 
 /**
@@ -23,7 +23,6 @@ import type {
  *   - final status (completed vs expired)
  *   - per-station breakdown
  *   - per-question reveal (correct answer vs student's answer, green/red)
- *   - for Listening: the replay change report (deteriorations/improvements)
  *
  * The exam form comes from the store (resolved by hydrate from the attempt's
  * module), so it matches what the attempt was graded against.
@@ -59,8 +58,6 @@ export function ResultsView({
   const { grade, status } = result;
   const pct = Math.round(grade.fraction * 100);
   const expired = status === "expired";
-  const deteriorated = grade.replay?.deteriorated ?? [];
-  const improved = grade.replay?.improved ?? [];
 
   return (
     <main className="flex-1 px-4 py-10">
@@ -89,63 +86,25 @@ export function ResultsView({
           )}
         </div>
 
-        {/* Replay change report (Listening only) */}
-        {grade.replay && (deteriorated.length > 0 || improved.length > 0) && (
-          <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4 text-sm">
-            <p className="font-semibold text-slate-800">Replay review impact</p>
-            <p className="mt-1 text-xs text-slate-500">
-              You changed some answers during the review phase.
-            </p>
-            <div className="mt-3 grid gap-2 sm:grid-cols-2">
-              <p
-                className={`rounded-lg px-3 py-2 ${
-                  deteriorated.length > 0
-                    ? "bg-rose-50 text-rose-700"
-                    : "bg-slate-50 text-slate-500"
-                }`}
-              >
-                {deteriorated.length} correct → wrong
-                {deteriorated.length > 0 ? " (over-confidence)" : ""}
-              </p>
-              <p
-                className={`rounded-lg px-3 py-2 ${
-                  improved.length > 0
-                    ? "bg-emerald-50 text-emerald-700"
-                    : "bg-slate-50 text-slate-500"
-                }`}
-              >
-                {improved.length} wrong → correct
-              </p>
-            </div>
-          </div>
-        )}
-
         {/* Per-station breakdown */}
         <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {grade.stations
-            .filter((s) => {
-              // Hide the replay station's own tile — it has no independent
-              // marks; its impact is shown above.
-              const st = exam.stations.find((x) => x.id === s.stationId);
-              return st?.kind !== "replay";
-            })
-            .map((s) => {
-              const meta = exam.stations.find((st) => st.id === s.stationId);
-              return (
-                <div
-                  key={s.stationId}
-                  className="rounded-xl border border-slate-200 bg-white p-4"
-                >
-                  <p className="text-xs font-medium text-slate-500">
-                    {meta?.title.split("—")[0].trim() ?? s.stationId}
-                  </p>
-                  <p className="mt-1 text-2xl font-bold text-slate-900">
-                    {s.correct}
-                    <span className="text-base text-slate-400">/{s.total}</span>
-                  </p>
-                </div>
-              );
-            })}
+          {grade.stations.map((s) => {
+            const meta = exam.stations.find((st) => st.id === s.stationId);
+            return (
+              <div
+                key={s.stationId}
+                className="rounded-xl border border-slate-200 bg-white p-4"
+              >
+                <p className="text-xs font-medium text-slate-500">
+                  {meta?.title.split("—")[0].trim() ?? s.stationId}
+                </p>
+                <p className="mt-1 text-2xl font-bold text-slate-900">
+                  {s.correct}
+                  <span className="text-base text-slate-400">/{s.total}</span>
+                </p>
+              </div>
+            );
+          })}
         </div>
 
         {/* Per-question reveal */}
@@ -168,9 +127,6 @@ export function ResultsView({
                         station={station}
                         questionId={q.id}
                         userAnswer={answers[key]?.payload}
-                        deteriorated={
-                          grade.replay?.deteriorated.includes(key) ?? false
-                        }
                       />
                     );
                   })}
@@ -205,13 +161,11 @@ function RevealRow({
   station,
   questionId,
   userAnswer,
-  deteriorated,
 }: {
   correct: boolean;
   station: AnyStation;
   questionId: string;
   userAnswer: unknown;
-  deteriorated: boolean;
 }) {
   // Find the question + its transcript/answer.
   const q = station.questions.find((qq) => qq.id === questionId)!;
@@ -287,21 +241,19 @@ function RevealRow({
       transcript = s.transcript;
       break;
     }
-    case "replay": {
-      const s = station as ReplayStation;
-      const rq = s.questions.find((x) => x.id === q.id)!;
-      label = `Review of question ${rq.sourceQuestionId}`;
-      correctText = "(see source station)";
-      userText = userFillText(userAnswer);
+    case "inference": {
+      const s = station as InferenceStation;
+      const sq = s.questions.find((x) => x.id === q.id)!;
+      label = sq.prompt;
+      correctText = sq.options[sq.correctOption];
+      userText = optionText(sq.options, userAnswer);
       transcript = s.transcript;
       break;
     }
   }
 
   const border = correct
-    ? deteriorated
-      ? "border-amber-300 bg-amber-50/40" // was right at snapshot, wrong now
-      : "border-emerald-200 bg-emerald-50/40"
+    ? "border-emerald-200 bg-emerald-50/40"
     : "border-rose-200 bg-rose-50/40";
   const badge = correct ? "bg-emerald-500" : "bg-rose-500";
 

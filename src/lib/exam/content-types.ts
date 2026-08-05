@@ -21,7 +21,7 @@ export type StationKind =
   | "distractor" // listening
   | "audioFill" // listening
   | "sentenceComplete" // listening
-  | "replay"; // listening review
+  | "inference"; // listening — advanced implicit-meaning / speaker-attitude
 
 /** T/F/NG verdicts (reading Station 3). */
 export type TfngVerdict = "true" | "false" | "not_given";
@@ -177,35 +177,31 @@ export interface SentenceCompleteStation {
 }
 
 /**
- * Station 4 — The "Replay Proof" Mechanic (review phase).
+ * Station 4 — Advanced Inference (the ceiling station).
  *
- * Not a content-driven station in the same way: it is a review of Station 3's
- * questions. The student may replay a bounded 15-second window of the
- * Station-3 audio per question and may change their answer. The grader
- * snapshots answers at review-start and compares to final to detect
- * "correct → wrong" deteriorations.
- *
- * To keep the engine uniform, the review window definitions are listed here
- * as content. Each entry references a Station-3 question id + audio segment.
+ * A single dense, fast Band 8-9 audio clip played ONCE for the whole station.
+ * The questions test implicit meaning and speaker attitude — not facts you can
+ * scan for. This is the ceiling diagnostic: weak students are diagnosed by
+ * Station 3, strong students are pushed to their breaking point here. No
+ * transcript is ever shown — that would turn a listening test into a reading
+ * test. Standard exact-match MCQ grading.
  */
-export interface ReplayQuestion extends BaseQuestion {
-  kind: "replay";
-  /** References a Station-3 sentenceComplete question id. */
-  sourceQuestionId: string;
-  /** Start/end of the 15s review window into the Station-3 audio, in seconds. */
-  segmentStart: number;
-  segmentEnd: number;
+export interface InferenceQuestion extends BaseQuestion {
+  kind: "inference";
+  prompt: string;
+  options: string[];
+  correctOption: number;
 }
-export interface ReplayStation {
-  kind: "replay";
-  id: "replay";
+export interface InferenceStation {
+  kind: "inference";
+  id: "inference";
   title: string;
   instructions: string;
-  /** Same audio as Station 3 — replay windows index into it. */
+  /** Single dense clip for the whole station. Played once. */
   audioSrc: string;
-  /** The Station-3 transcript, shown now that review is allowed. */
+  /** Transcript — revealed on RESULTS ONLY, never during the attempt. */
   transcript: string;
-  questions: ReplayQuestion[];
+  questions: InferenceQuestion[];
 }
 
 /* ----------------------------- Station union ----------------------------- */
@@ -218,7 +214,7 @@ export type AnyStation =
   | DistractorStation
   | AudioFillStation
   | SentenceCompleteStation
-  | ReplayStation;
+  | InferenceStation;
 
 /** Any question, any module. Used by the grader's flatten helper. */
 export type AnyQuestion =
@@ -229,7 +225,7 @@ export type AnyQuestion =
   | DistractorQuestion
   | AudioFillQuestion
   | SentenceCompleteQuestion
-  | ReplayQuestion;
+  | InferenceQuestion;
 
 /** A whole exam form (reading or listening). */
 export interface ExamForm {
@@ -254,7 +250,7 @@ export interface ListeningExam extends ExamForm {
     DistractorStation,
     AudioFillStation,
     SentenceCompleteStation,
-    ReplayStation
+    InferenceStation
   ];
 }
 

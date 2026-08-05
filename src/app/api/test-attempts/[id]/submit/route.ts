@@ -101,8 +101,7 @@ export async function POST(
     const grade = gradeExam(
       exam,
       preData.answers ?? {},
-      nowMs,
-      preData.reviewSnapshot ?? null
+      nowMs
     );
 
     await db.runTransaction(async (txn) => {

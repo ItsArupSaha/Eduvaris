@@ -11,18 +11,17 @@ import { ScanStationView } from "./stations/ScanStationView";
 import { DistractorStationView } from "./stations/DistractorStationView";
 import { AudioFillStationView } from "./stations/AudioFillStationView";
 import { SentenceCompleteStationView } from "./stations/SentenceCompleteStationView";
-import { ReplayStationView } from "./stations/ReplayStationView";
+import { InferenceStationView } from "./stations/InferenceStationView";
 
 /**
  * Routes to the correct station component by index + renders the station
  * advance button. Module-agnostic — dispatches on station.kind.
  *
  * The advance button is enabled when every question is "answered":
- *   - MCQ kinds (skim/synonym/distractor) → optionIndex >= 0
+ *   - MCQ kinds (skim/synonym/distractor/inference) → optionIndex >= 0
  *   - tfng → locked
  *   - scan → locked
  *   - audioFill / sentenceComplete → has any text
- *   - replay → always advancable (review has no required state)
  *
  * Hard-blocking would let a frozen timer trap the user. We warn, we don't
  * block. Unanswered questions grade as incorrect.
@@ -52,6 +51,7 @@ export function StationRouter({
       case "skim":
       case "synonym":
       case "distractor":
+      case "inference":
         return (
           acc +
           (rec.payload.kind === q.kind && rec.payload.optionIndex >= 0 ? 1 : 0)
@@ -65,8 +65,6 @@ export function StationRouter({
           acc +
           (rec.payload.kind === q.kind && rec.payload.text.trim() ? 1 : 0)
         );
-      case "replay":
-        return acc + 1; // review is always "complete enough"
     }
   }, 0);
   const total = station.questions.length;
@@ -99,7 +97,7 @@ export function StationRouter({
       {station.kind === "sentenceComplete" && (
         <SentenceCompleteStationView station={station} />
       )}
-      {station.kind === "replay" && <ReplayStationView station={station} />}
+      {station.kind === "inference" && <InferenceStationView station={station} />}
 
       <div className="mt-8 flex items-center justify-between">
         <span className="text-xs text-slate-400">

@@ -37,7 +37,7 @@ export type AnswerPayload =
   | { kind: "distractor"; optionIndex: number }
   | { kind: "audioFill"; text: string }
   | { kind: "sentenceComplete"; text: string }
-  | { kind: "replay"; text: string };
+  | { kind: "inference"; optionIndex: number };
 
 /**
  * One answer record. Keyed by `${stationId}.${questionId}` in `answers`.
@@ -64,23 +64,6 @@ export interface StationGrade {
   perQuestion: Record<string, boolean>;
 }
 
-/**
- * Replay-review change tracking (Listening Station 4).
- *
- * Snapshotted at review-start; on submit the grader compares each review
- * question's snapshot vs final. A "deterioration" is a question that was
- * correct at snapshot but wrong at final — the overconfidence signal the
- * blueprint asks for. Null on modules without a replay station.
- */
-export interface ReplayChangeReport {
-  /** Epoch ms when the review snapshot was taken. */
-  snapshotAt: number;
-  /** Question keys that were correct at snapshot, wrong at final. */
-  deteriorated: string[];
-  /** Question keys that were wrong at snapshot, correct at final. */
-  improved: string[];
-}
-
 /** Overall grade attached on submit/expire. */
 export interface Grade {
   totalCorrect: number;
@@ -88,8 +71,6 @@ export interface Grade {
   fraction: number;
   stations: StationGrade[];
   gradedAt: number;
-  /** Listening only. Null otherwise. */
-  replay?: ReplayChangeReport | null;
 }
 
 /** The full attempt document. */
@@ -107,12 +88,6 @@ export interface TestAttempt {
   tabSwitchCount: number;
   creditsConsumed: number;
   grade: Grade | null;
-  /**
-   * Snapshot of answers at the moment the Listening review phase began.
-   * Server stores this so the grader can detect correct→wrong changes. Null
-   * on modules without a replay station.
-   */
-  reviewSnapshot: AnswersMap | null;
 }
 
 /** The forward-progress fields the PATCH route is allowed to merge. */
@@ -120,7 +95,6 @@ export const PATCHABLE_FIELDS = [
   "stationIndex",
   "answers",
   "tabSwitchCount",
-  "reviewSnapshot",
 ] as const;
 export type PatchableField = (typeof PATCHABLE_FIELDS)[number];
 
