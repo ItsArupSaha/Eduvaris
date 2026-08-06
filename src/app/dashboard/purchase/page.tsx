@@ -8,6 +8,7 @@ import { firebaseDb } from "@/lib/firebase/client";
 import { useAuthStore } from "@/store/auth-store";
 import { createPaymentRequest } from "@/lib/firebase/auth-token";
 import {
+  MODULE_BUNDLE,
   MODULE_LABELS,
   normalizeTrxId,
   TRXID_REGEX,
@@ -35,18 +36,28 @@ export default function PurchasePage() {
   const user = useAuthStore((s) => s.user);
   const profile = useAuthStore((s) => s.profile);
 
-  // Resolve the module ONCE from the ?module= query param. Valid → locked.
-  // Invalid/absent → null (picker shown). useMemo with empty deps freezes it
-  // so mid-flow URL changes can't swap the module.
-  const presetModule = useMemo<ModuleKey | null>(() => {
+  // Resolve the mode ONCE from the query string:
+  //   ?bundle=1 → bundle mode (all 4 modules, 185 BDT)
+  //   ?module=X → single-module mode (locked to X)
+  //   absent/invalid → single-module picker shown
+  // useMemo with empty deps freezes it so mid-flow URL changes can't swap modes.
+  const { isBundle, presetModule } = useMemo<{
+    isBundle: boolean;
+    presetModule: ModuleKey | null;
+  }>(() => {
+    if (searchParams.get("bundle") === "1") {
+      return { isBundle: true, presetModule: null };
+    }
     const raw = searchParams.get("module");
     if (raw && (MODULE_KEYS as string[]).includes(raw)) {
-      return raw as ModuleKey;
+      return { isBundle: false, presetModule: raw as ModuleKey };
     }
-    return null;
+    return { isBundle: false, presetModule: null };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // `mode` is fixed for the page's lifetime: "bundle" or the single module
+  // (preset or picked). For bundles there's no picker — all 4 are included.
   const [module, setModule] = useState<ModuleKey | null>(presetModule);
   const [trxId, setTrxId] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -60,7 +71,9 @@ export default function PurchasePage() {
   const [rejectReason, setRejectReason] = useState<string | null>(null);
 
   const bKashNumber = process.env.NEXT_PUBLIC_BKASH_NUMBER ?? "";
-  const price = 50; // display price; server is source of truth on the doc.
+  // Display price: server is the source of truth on the doc; this is just the
+  // number we render to the student.
+  const price = isBundle ? 185 : 50;
   const normalized = normalizeTrxId(trxId);
   const trxValid = TRXID_REGEX.test(normalized);
 
@@ -85,14 +98,18 @@ export default function PurchasePage() {
   }, [watchingId]);
 
   async function handleSubmit() {
-    if (!module || !trxValid) return;
+    // Bundle needs only a valid TrxID. Single needs a module too.
+    if (!isBundle && !module) return;
+    if (!trxValid) return;
     setSubmitting(true);
     setError(null);
     try {
-      const { requestId } = await createPaymentRequest({
-        module,
-        trxId: normalized,
-      });
+      const { requestId } = isBundle
+        ? await createPaymentRequest({ bundle: true, trxId: normalized })
+        : await createPaymentRequest({
+            module: module as string,
+            trxId: normalized,
+          });
       setWatchingId(requestId);
       setLiveStatus("pending");
     } catch (err) {
@@ -116,19 +133,41 @@ export default function PurchasePage() {
   }, [profile, module]);
 
   // ---- Resolved (approved) ----
-  if (liveStatus === "approved" && module) {
+  if (liveStatus === "approved") {
+    if (isBundle) {
+      return (
+        <SuccessShell
+          title="Bundle payment verified"
+          subtitle="All four modules unlocked. +1 attempt on each."
+          onPrimary={() => router.push("/dashboard")}
+          primaryLabel="Back to dashboard"
+        >
+          <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+            {MODULE_BUNDLE.map((m) => (
+              <span
+                key={m}
+                className="rounded-lg bg-emerald-50 px-3 py-1.5 font-medium text-emerald-700"
+              >
+                {MODULE_LABELS[m]}: {profile?.credits?.[m] ?? 0} attempt(s)
+              </span>
+            ))}
+          </div>
+        </SuccessShell>
+      );
+    }
+    if (!module) return null;
     return (
       <SuccessShell
         title="Payment verified"
         subtitle={`${MODULE_LABELS[module]} module unlocked. You now have ${
-          (profile?.credits?.[module] ?? 0)
+          profile?.credits?.[module] ?? 0
         } attempt(s) available.`}
         onPrimary={() => router.push("/dashboard")}
         primaryLabel="Back to dashboard"
       >
         <p className="text-xs text-slate-500">
-          The diagnostic engine (Task 5) will consume one credit when you start
-          the exam. Pay again to retake.
+          The diagnostic engine will consume one credit when you start the exam.
+          Pay again to retake.
         </p>
       </SuccessShell>
     );
@@ -166,11 +205,23 @@ export default function PurchasePage() {
             <span className="font-mono font-semibold text-slate-900">
               {normalized}
             </span>{" "}
-            for the{" "}
-            <span className="font-semibold text-slate-900">
-              {module ? MODULE_LABELS[module] : ""}
-            </span>{" "}
-            module is in the queue.
+            {isBundle ? (
+              <>
+                for the{" "}
+                <span className="font-semibold text-slate-900">
+                  all-modules bundle
+                </span>{" "}
+                is in the queue.
+              </>
+            ) : (
+              <>
+                for the{" "}
+                <span className="font-semibold text-slate-900">
+                  {module ? MODULE_LABELS[module] : ""}
+                </span>{" "}
+                module is in the queue.
+              </>
+            )}
           </p>
           <p className="mt-4 text-xs text-slate-500 max-w-md mx-auto">
             Payments are verified manually by our team. It may take up to
@@ -194,22 +245,39 @@ export default function PurchasePage() {
     );
   }
 
-  // ---- Default: module (picker or locked) → instructions → form ----
+  // ---- Default: (bundle | module picker | module locked) → instructions → form ----
   return (
     <Shell>
       <header className="mb-8">
         <h1 className="text-2xl font-bold text-slate-900">
-          {presetModule
+          {isBundle
+            ? "Unlock all modules"
+            : presetModule
             ? `Unlock ${MODULE_LABELS[presetModule]}`
             : "Purchase a module"}
         </h1>
         <p className="mt-1 text-sm text-slate-500">
-          {price} BDT per attempt. One payment = one attempt at this module only.
+          {isBundle
+            ? `${price} BDT for one attempt at every module (save 15).`
+            : `${price} BDT per attempt. One payment = one attempt at this module only.`}
         </p>
       </header>
 
-      {/* Step 1: module picker — ONLY shown when no valid ?module= was provided */}
-      {!presetModule && (
+      {/* Bundle banner: shown when ?bundle=1 locked the flow to all 4 */}
+      {isBundle && (
+        <div className="mt-6 rounded-xl border border-indigo-300 bg-indigo-50 px-4 py-3 text-sm">
+          <span className="font-semibold text-indigo-800">
+            Bundle: all four modules
+          </span>
+          <span className="text-indigo-700">
+            {" "}— this payment unlocks Reading, Listening, Writing, and Speaking
+            (one attempt each).
+          </span>
+        </div>
+      )}
+
+      {/* Step 1: module picker — ONLY for single-module mode with no preset */}
+      {!isBundle && !presetModule && (
         <Section step={1} title="Choose a module" done={!!module}>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {MODULE_KEYS.map((m) => {
@@ -241,8 +309,8 @@ export default function PurchasePage() {
         </Section>
       )}
 
-      {/* Module-locked banner: shown when ?module= locked the flow */}
-      {presetModule && (
+      {/* Module-locked banner: shown when ?module= locked the flow (single) */}
+      {!isBundle && presetModule && (
         <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm">
           <span className="font-semibold text-amber-800">
             Module: {MODULE_LABELS[presetModule]}
@@ -253,9 +321,10 @@ export default function PurchasePage() {
         </div>
       )}
 
-      {/* Step 2: bKash instructions + form (only after module chosen) */}
-      {module && (
-        <Section step={presetModule ? 1 : 2} title="Send 50 BDT via bKash">
+      {/* Step 2: bKash instructions. For bundles there's no module to pick —
+          instructions show immediately. For singles, after a module is set. */}
+      {(isBundle || module) && (
+        <Section step={isBundle ? 1 : presetModule ? 1 : 2} title={`Send ${price} BDT via bKash`}>
           <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
             <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
               Send Money to
@@ -278,7 +347,7 @@ export default function PurchasePage() {
               </li>
               <li>3. Confirm and copy the 10-character TrxID.</li>
             </ol>
-            {creditBalance > 0 && (
+            {!isBundle && creditBalance > 0 && (
               <p className="mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
                 You already own {creditBalance} attempt
                 {creditBalance > 1 ? "s" : ""} for this module. You can start
@@ -290,8 +359,8 @@ export default function PurchasePage() {
       )}
 
       {/* Step 3 (or 2): TrxID entry */}
-      {module && (
-        <Section step={presetModule ? 2 : 3} title="Enter your bKash TrxID">
+      {(isBundle || module) && (
+        <Section step={isBundle ? 2 : presetModule ? 2 : 3} title="Enter your bKash TrxID">
           <label className="block">
             <span className="text-xs font-medium text-slate-500">
               Transaction ID (10 characters)

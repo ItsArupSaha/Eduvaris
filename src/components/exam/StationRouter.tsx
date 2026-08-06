@@ -56,49 +56,12 @@ export function StationRouter({
   // have landed on the server. Non-last stations never see this.
   const pendingUploads = usePendingUploadCount();
 
-  if (!exam) return null;
-  const station = exam.stations[stationIndex];
-
-  const answeredCount = station.questions.reduce<number>((acc, q) => {
-    const key = answerKey(station.id, q.id);
-    const rec = answers[key];
-    if (!rec) return acc;
-    const p = rec.payload;
-    switch (q.kind) {
-      case "skim":
-      case "synonym":
-      case "distractor":
-      case "inference":
-        return acc + (p.kind === q.kind && p.optionIndex >= 0 ? 1 : 0);
-      case "tfng":
-      case "scan":
-        return acc + (rec.locked ? 1 : 0);
-      case "paraphrase":
-        return acc + (rec.locked ? 1 : 0);
-      case "cohesion":
-        return (
-          acc +
-          (p.kind === "cohesion" &&
-          p.orderedIndices.length === q.scrambledSentences.length &&
-          p.transitionPlacement >= 0
-            ? 1
-            : 0)
-        );
-      case "audioFill":
-      case "sentenceComplete":
-      case "bodyParagraph":
-        return acc + (p.kind === q.kind && p.text.trim() ? 1 : 0);
-      case "imageFluency":
-      case "rapidFire":
-      case "cueCard":
-      case "abstractAnswer":
-        // Speaking answers: a non-empty Storage path = recorded.
-        return acc + (p.kind === q.kind && p.audioPath ? 1 : 0);
-    }
-  }, 0);
-  const total = station.questions.length;
-  const allAnswered = answeredCount === total;
-  const isLast = stationIndex === exam.stations.length - 1;
+  // isLast is derived from the store snapshot so the hooks below can be
+  // declared BEFORE the early `if (!exam) return null` — hooks can't be
+  // conditional. exam?.stations length is read safely.
+  const isLast = exam
+    ? stationIndex === exam.stations.length - 1
+    : false;
 
   const handleAdvance = useCallback(async () => {
     if (isLast) {
@@ -146,6 +109,49 @@ export function StationRouter({
   const handleStationComplete = useCallback(() => {
     handleAdvance();
   }, [handleAdvance]);
+
+  if (!exam) return null;
+  const station = exam.stations[stationIndex];
+
+  const answeredCount = station.questions.reduce<number>((acc, q) => {
+    const key = answerKey(station.id, q.id);
+    const rec = answers[key];
+    if (!rec) return acc;
+    const p = rec.payload;
+    switch (q.kind) {
+      case "skim":
+      case "synonym":
+      case "distractor":
+      case "inference":
+        return acc + (p.kind === q.kind && p.optionIndex >= 0 ? 1 : 0);
+      case "tfng":
+      case "scan":
+        return acc + (rec.locked ? 1 : 0);
+      case "paraphrase":
+        return acc + (rec.locked ? 1 : 0);
+      case "cohesion":
+        return (
+          acc +
+          (p.kind === "cohesion" &&
+          p.orderedIndices.length === q.scrambledSentences.length &&
+          p.transitionPlacement >= 0
+            ? 1
+            : 0)
+        );
+      case "audioFill":
+      case "sentenceComplete":
+      case "bodyParagraph":
+        return acc + (p.kind === q.kind && p.text.trim() ? 1 : 0);
+      case "imageFluency":
+      case "rapidFire":
+      case "cueCard":
+      case "abstractAnswer":
+        // Speaking answers: a non-empty Storage path = recorded.
+        return acc + (p.kind === q.kind && p.audioPath ? 1 : 0);
+    }
+  }, 0);
+  const total = station.questions.length;
+  const allAnswered = answeredCount === total;
 
   return (
     <div>

@@ -10,6 +10,7 @@ import {
   type MyPaymentRequest,
 } from "@/lib/firebase/auth-token";
 import { MODULE_LABELS } from "@/lib/firebase/payment-types";
+import { MODULE_KEYS } from "@/lib/firebase/user-types";
 
 /**
  * /admin — manual bKash payment verification queue.
@@ -149,21 +150,52 @@ export default function AdminPage() {
             {items.map((item) => (
               <li
                 key={item.id}
-                className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+                className={`rounded-2xl border bg-white p-5 shadow-sm ${
+                  item.isBundle
+                    ? "border-indigo-400 ring-2 ring-indigo-200"
+                    : "border-slate-200"
+                }`}
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="rounded-md bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700">
-                        {MODULE_LABELS[item.module as keyof typeof MODULE_LABELS] ?? item.module}
-                      </span>
-                      <span className="text-xs text-slate-500">
-                        {item.amount} BDT
-                      </span>
+                      {item.isBundle ? (
+                        // LOUD bundle badge — distinct indigo, larger text,
+                        // so the admin never confuses a 50 BDT payment with a
+                        // 185 BDT bundle. This is the amount-enforcement surface.
+                        <span className="rounded-md bg-indigo-600 px-3 py-1 text-sm font-extrabold uppercase tracking-wide text-white shadow-sm">
+                          Bundle — {item.amount} BDT
+                        </span>
+                      ) : (
+                        <span className="rounded-md bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700">
+                          {MODULE_LABELS[item.module as keyof typeof MODULE_LABELS] ?? item.module}
+                        </span>
+                      )}
+                      {!item.isBundle && (
+                        <span className="text-xs text-slate-500">
+                          {item.amount} BDT
+                        </span>
+                      )}
                       <span className="text-xs text-slate-400">
                         {formatTime(item.createdAt)}
                       </span>
                     </div>
+
+                    {/* Bundle: list the 4 target modules so the admin sees
+                        exactly what approving will grant. */}
+                    {item.isBundle && (
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {(item.modules ?? MODULE_KEYS).map((m) => (
+                          <span
+                            key={m}
+                            className="rounded-md border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700"
+                          >
+                            {MODULE_LABELS[m as keyof typeof MODULE_LABELS] ?? m}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
                     <div className="mt-2 grid grid-cols-1 gap-1 text-sm sm:grid-cols-2">
                       <Field label="TrxID" value={item.trxId} mono />
                       <Field label="User" value={item.uid} mono truncate />
@@ -175,7 +207,11 @@ export default function AdminPage() {
                       type="button"
                       onClick={() => handleApprove(item.id)}
                       disabled={busyId === item.id}
-                      className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                      className={`rounded-lg px-3 py-2 text-xs font-semibold text-white disabled:opacity-50 ${
+                        item.isBundle
+                          ? "bg-indigo-600 hover:bg-indigo-700"
+                          : "bg-emerald-600 hover:bg-emerald-700"
+                      }`}
                     >
                       {busyId === item.id ? "…" : "Approve"}
                     </button>

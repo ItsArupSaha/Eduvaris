@@ -45,6 +45,8 @@ export interface MyPaymentRequest {
   id: string;
   uid: string;
   module: string;
+  isBundle?: boolean;
+  modules?: string[];
   amount: number;
   trxId: string;
   status: "pending" | "approved" | "rejected";
@@ -54,11 +56,16 @@ export interface MyPaymentRequest {
   rejectReason: string | null;
 }
 
-/** POST /api/payment-requests */
-export function createPaymentRequest(args: {
-  module: string;
-  trxId: string;
-}): Promise<CreatePaymentResponse> {
+/**
+ * POST /api/payment-requests
+ *
+ * Two accepted shapes (server enforces exactly one):
+ *   - Bundle: { bundle: true, trxId }
+ *   - Single: { module: ModuleKey, trxId }
+ */
+export function createPaymentRequest(
+  args: { bundle: true; trxId: string } | { module: string; trxId: string }
+): Promise<CreatePaymentResponse> {
   return apiFetch<CreatePaymentResponse>("/api/payment-requests", {
     method: "POST",
     body: JSON.stringify(args),

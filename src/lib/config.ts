@@ -26,9 +26,21 @@ export const NEXT_PUBLIC_BKASH_NUMBER = process.env.NEXT_PUBLIC_BKASH_NUMBER ?? 
 /** Price per module attempt in BDT. Server is the source of truth. */
 export const MODULE_PRICE = Number(process.env.MODULE_PRICE ?? 50);
 
+/**
+ * Price for the "Buy All" bundle in BDT. Defaults to 185 (4×50 − 15 discount).
+ * Server-only; never shipped to the client. The purchase UI shows its own
+ * display copy (server is source of truth — same trust model as MODULE_PRICE).
+ */
+export const BUNDLE_PRICE = Number(process.env.BUNDLE_PRICE ?? 185);
+
 /** Validate a module key against the known set. */
 export function isModuleKey(value: unknown): value is ModuleKey {
   return typeof value === "string" && (MODULE_KEYS as string[]).includes(value);
+}
+
+/** Validate that a value is the bundle marker ("bundle"). */
+export function isBundleMode(value: unknown): value is "bundle" {
+  return value === "bundle";
 }
 
 /** True if uid is in the admin allowlist. */

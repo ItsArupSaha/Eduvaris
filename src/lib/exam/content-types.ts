@@ -348,12 +348,13 @@ export interface RapidFireStation {
 /**
  * Speaking Station 2 — Narrative Tense Control (Part 2 cue card).
  *
- * A standard IELTS Part 2 cue card. 1 min prep (silent countdown), then 2
- * min speaking. When prep ends, a short audio cue ("Now begin speaking") is
- * auto-played and the mic opens automatically — the student must speak for
- * the full `speakSeconds` (no smart cut-off) to test endurance. Audio is
- * captured by the MediaRecorder API, transcribed by Whisper on submit; no
- * live text is shown.
+ * A standard IELTS Part 2 cue card. The teacher speaks the task aloud first
+ * (`examinerAudioSrc`), mirroring how a real examiner briefs the candidate.
+ * Then 1 min prep (silent countdown), then 2 min speaking. When prep ends,
+ * a short audio cue ("Now begin speaking") is auto-played and the mic opens
+ * automatically — the student must speak for the full `speakSeconds` (no
+ * smart cut-off) to test endurance. Audio is captured by the MediaRecorder
+ * API, transcribed by Whisper on submit; no live text is shown.
  */
 export interface CueCardQuestion extends BaseQuestion {
   kind: "cueCard";
@@ -369,6 +370,12 @@ export interface CueCardStation {
   kind: "cueCard";
   id: "cueCard";
   title: string;
+  /**
+   * Spoken aloud by the teacher at the start of the station — mirrors how a
+   * real examiner briefs the candidate. The on-screen text mirrors this so the
+   * spoken + written scripts stay in sync. Path under /public.
+   */
+  examinerAudioSrc: string;
   instructions: string;
   questions: CueCardQuestion[];
 }

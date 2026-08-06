@@ -13,8 +13,11 @@ import { enqueueSpeakingUpload } from "@/lib/exam/upload-queue";
 /**
  * Speaking Station 3 — Narrative Tense Control (Part 2 cue card).
  *
- * Phases: prep (60s) → cue → speak (full 120s, no cut-off, endurance test)
- * → done. Audio captured by MediaRecorder, uploaded in the background,
+ * Phases: intro (teacher speaks the task) → prep (60s) → cue → speak (full
+ * 120s, no cut-off, endurance test) → done. The teacher briefing mirrors
+ * Sections 2 & 4: an examiner audio clip auto-plays first and the student
+ * waits — there is no "start" button. Prep begins automatically when the
+ * briefing ends. Audio captured by MediaRecorder, uploaded in the background,
  * transcribed by Whisper on submit.
  */
 export function CueCardStationView({ station }: { station: CueCardStation }) {
@@ -29,9 +32,9 @@ export function CueCardStationView({ station }: { station: CueCardStation }) {
   const rec = answers[key];
   const audioPath = rec?.payload?.kind === "cueCard" ? rec.payload.audioPath : "";
 
-  const [phase, setPhase] = useState<"prep" | "cue" | "speak" | "done">(
-    rec?.locked || audioPath ? "done" : "prep"
-  );
+  const [phase, setPhase] = useState<
+    "intro" | "prep" | "cue" | "speak" | "done"
+  >(rec?.locked || audioPath ? "done" : "intro");
 
   const { state, start, stop } = useMediaRecorder({
     micId: `${station.id}.${q.id}`,
@@ -55,6 +58,7 @@ export function CueCardStationView({ station }: { station: CueCardStation }) {
     },
   });
 
+  const beginPrep = () => setPhase("prep");
   const beginCue = () => setPhase("cue");
   const beginSpeak = async () => {
     setPhase("speak");
@@ -77,7 +81,8 @@ export function CueCardStationView({ station }: { station: CueCardStation }) {
       <p className="mb-5 text-sm text-slate-500">{station.instructions}</p>
 
       <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-        {/* Cue card — always visible */}
+        {/* Cue card — visible from intro onward so the spoken line "the cue
+            card is on the screen" stays accurate. */}
         <div className="mb-5 rounded-lg border-2 border-amber-300 bg-amber-50/60 p-4">
           <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">
             Cue card
@@ -93,7 +98,9 @@ export function CueCardStationView({ station }: { station: CueCardStation }) {
 
         <div className="mb-3 flex items-center justify-between">
           <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-            {phase === "prep"
+            {phase === "intro"
+              ? "Listen"
+              : phase === "prep"
               ? "Preparation"
               : phase === "cue"
               ? "Starting"
@@ -116,6 +123,20 @@ export function CueCardStationView({ station }: { station: CueCardStation }) {
             />
           )}
         </div>
+
+        {phase === "intro" && (
+          <div className="text-center">
+            <PlayOnceAudio
+              src={station.examinerAudioSrc}
+              autoPlay
+              onPlayed={beginPrep}
+            />
+            <p className="mt-2 text-xs text-slate-400">
+              The teacher is briefing you. Preparation begins when the audio
+              finishes.
+            </p>
+          </div>
+        )}
 
         {phase === "prep" && (
           <p className="text-center text-sm font-medium text-amber-700">

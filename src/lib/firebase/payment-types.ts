@@ -19,13 +19,41 @@ export const MODULE_LABELS: Record<ModuleKey, string> = {
 };
 
 /**
+ * The full set of modules a bundle grants. A bundle is all-or-nothing: +1 to
+ * each of these in a single atomic transaction.
+ */
+export const MODULE_BUNDLE: ModuleKey[] = [
+  "reading",
+  "listening",
+  "writing",
+  "speaking",
+];
+
+/**
  * `paymentRequests/{requestId}` — a user-submitted bKash payment awaiting
  * manual admin verification. One doc per submission.
+ *
+ * Two shapes coexist (discriminated by `isBundle`):
+ *   - Single module (default): `module` is one of reading|listening|writing|
+ *     speaking, `isBundle` absent, `modules` absent.
+ *   - Bundle: `module: "bundle"` (label only), `isBundle: true`,
+ *     `modules: [reading, listening, writing, speaking]`.
+ *
+ * The grant logic reads `modules ?? [module]` so single-module docs (which
+ * predate the bundle feature and have neither field) keep working unchanged.
  */
 export interface PaymentRequest {
   /** doc id == the Firestore auto-id assigned at creation. */
   uid: string;
-  module: ModuleKey;
+  /**
+   * The module being purchased, OR the literal "bundle" for bundle requests.
+   * For bundles this is a label only — the real grant targets are in `modules`.
+   */
+  module: ModuleKey | "bundle";
+  /** True only for bundle requests. Absent on single-module requests. */
+  isBundle?: boolean;
+  /** The modules a bundle grants. Present only on bundle requests. */
+  modules?: ModuleKey[];
   /** Price in BDT, captured at request time so historical requests survive price changes. */
   amount: number;
   /** Normalized uppercase alphanumeric bKash TrxID. */
@@ -39,6 +67,16 @@ export interface PaymentRequest {
   reviewedBy: string | null;
   /** Free-text reason, only populated on rejection. */
   rejectReason: string | null;
+}
+
+/**
+ * Type guard: is this payment request a bundle? Treats a missing `isBundle`
+ * flag as false (single-module), which is correct for all legacy docs.
+ */
+export function isBundleRequest(
+  data: { isBundle?: boolean } | undefined | null
+): data is { isBundle: true; modules: ModuleKey[]; module: "bundle" } {
+  return !!data?.isBundle;
 }
 
 /**

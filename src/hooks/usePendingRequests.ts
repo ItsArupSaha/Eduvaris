@@ -32,15 +32,18 @@ export interface PendingMap {
  */
 export function usePendingRequests(): {
   map: PendingMap;
+  bundle: ModuleRequestState;
   loading: boolean;
 } {
   const user = useAuthStore((s) => s.user);
   const [map, setMap] = useState<PendingMap>({});
+  const [bundle, setBundle] = useState<ModuleRequestState>("none");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!user) {
       setMap({});
+      setBundle("none");
       setLoading(false);
       return;
     }
@@ -59,12 +62,33 @@ export function usePendingRequests(): {
         const next: PendingMap = {};
         // Seed all modules as "none".
         for (const m of MODULE_KEYS) next[m] = "none";
+        let bundleState: ModuleRequestState = "none";
 
         // Derive per-module state. pending wins over rejected (if both exist),
-        // because a pending request is the live blocker.
+        // because a pending request is the live blocker. Bundle requests are
+        // tracked separately (not attributed to any single module).
         snap.forEach((d) => {
-          const data = d.data() as { module: ModuleKey; status: string };
+          const data = d.data() as {
+            module: ModuleKey;
+            isBundle?: boolean;
+            status: string;
+          };
           if (!data.module) return;
+
+          // Bundle requests go to the separate bundle state.
+          if (data.isBundle === true) {
+            if (data.status === "pending") {
+              bundleState = "pending";
+            } else if (
+              data.status === "rejected" &&
+              bundleState !== "pending"
+            ) {
+              bundleState = "rejected";
+            }
+            return;
+          }
+
+          // Single-module requests go to their module key.
           if (data.status === "pending") {
             next[data.module] = "pending";
           } else if (
@@ -75,6 +99,7 @@ export function usePendingRequests(): {
           }
         });
         setMap(next);
+        setBundle(bundleState);
         setLoading(false);
       },
       // Swallow transient permission errors during sign-out.
@@ -84,5 +109,5 @@ export function usePendingRequests(): {
     return () => unsub();
   }, [user]);
 
-  return { map, loading };
+  return { map, bundle, loading };
 }

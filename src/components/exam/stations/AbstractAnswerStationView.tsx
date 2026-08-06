@@ -145,11 +145,21 @@ function AbstractRecorder({
     },
   });
 
-  const phase: "audio" | "ready" | "speak" = state.recording
+  // Two phases: "audio" (examiner speaking) → "speak" (mic live). The mic
+  // auto-opens when the examiner audio finishes — no manual button. If the
+  // grant fails we fall back to a "ready" view with a manual retry.
+  const phase: "audio" | "speak" | "ready" = state.recording
     ? "speak"
-    : audioDone
+    : audioDone && state.error
     ? "ready"
+    : audioDone
+    ? "audio"
     : "audio";
+
+  // Examiner finished → open the mic immediately.
+  const beginSpeak = () => {
+    void start();
+  };
 
   const lockAndNext = () => {
     if (state.recording) {
@@ -170,17 +180,26 @@ function AbstractRecorder({
           <PlayOnceAudio
             src={question.examinerAudioSrc}
             autoPlay
-            onPlayed={() => setAudioDone(true)}
+            // Mic auto-opens the moment the examiner finishes. No manual
+            // button — seamless examiner→student handoff.
+            onPlayed={() => {
+              setAudioDone(true);
+              beginSpeak();
+            }}
           />
           <p className="mt-2 text-xs text-slate-400">
-            The examiner is asking the question. The mic button appears once it
-            finishes.
+            The examiner is asking the question. The mic opens automatically
+            when it finishes — start speaking right away.
           </p>
         </>
       )}
 
       {phase === "ready" && (
-        <div className="flex items-center justify-center gap-3">
+        // Only shown when the auto-open mic grant failed. Manual fallback.
+        <div className="flex flex-col items-center gap-3 py-2">
+          <p className="text-xs text-rose-600">
+            Microphone error: {state.error}. Grant mic access and try again.
+          </p>
           <button
             type="button"
             onClick={() => void start()}
@@ -189,16 +208,6 @@ function AbstractRecorder({
           >
             ▶ Start speaking
           </button>
-          {anyMicActive && (
-            <span className="text-xs text-slate-400">
-              Another recording is in progress.
-            </span>
-          )}
-          {state.error && (
-            <span className="text-xs text-rose-600">
-              Mic error: {state.error}
-            </span>
-          )}
         </div>
       )}
 
@@ -213,7 +222,7 @@ function AbstractRecorder({
                 }`}
               />
               <span className="text-xs font-medium text-slate-600">
-                {state.recording ? "Recording…" : "Ready when you are"}
+                {state.recording ? "Recording…" : "Mic paused"}
               </span>
             </div>
             <Countdown

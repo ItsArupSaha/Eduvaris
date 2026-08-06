@@ -16,6 +16,11 @@ function purchaseHref(m: ModuleKey): string {
   return `/dashboard/purchase?module=${m}`;
 }
 
+/** Build the purchase URL for the bundle (all 4 modules). */
+function bundlePurchaseHref(): string {
+  return `/dashboard/purchase?bundle=1`;
+}
+
 /**
  * Dashboard — real Task 4 UI.
  *
@@ -28,7 +33,7 @@ export default function DashboardPage() {
   const user = useAuthStore((s) => s.user);
   const profile = useAuthStore((s) => s.profile);
   const reset = useAuthStore((s) => s.reset);
-  const { map: pendingMap } = usePendingRequests();
+  const { map: pendingMap, bundle: bundleState } = usePendingRequests();
 
   async function handleSignOut() {
     await signOut();
@@ -82,18 +87,16 @@ export default function DashboardPage() {
         </div>
 
         {/* Section title */}
-        <div className="mb-4 flex items-center justify-between">
+        <div className="mb-4 flex items-center justify-between gap-3">
           <h2 className="text-lg font-bold text-slate-900">Your modules</h2>
-          <Link
-            href="/dashboard/purchase"
-            className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-amber-600"
-          >
-            Buy a module
-          </Link>
+          <BundleButton
+            href={bundlePurchaseHref()}
+            state={bundleState ?? "none"}
+          />
         </div>
         <p className="mb-4 text-xs text-slate-400">
-          Each module is a separate 50 BDT attempt. One payment unlocks one
-          attempt at that module only.
+          Each module is a separate 50 BDT attempt — or unlock all four at once
+          for 185 BDT (save 15).
         </p>
 
         {/* Module grid */}
@@ -272,5 +275,49 @@ function StartButton({
         <p className="mt-1.5 text-center text-xs text-rose-600">{error}</p>
       )}
     </div>
+  );
+}
+
+/**
+ * "Buy All" bundle button. Shows a distinct state when a bundle request is
+ * pending or rejected so the student understands why the button is disabled
+ * or why they might retry.
+ */
+function BundleButton({
+  href,
+  state,
+}: {
+  href: string;
+  state: ModuleRequestState;
+}) {
+  if (state === "pending") {
+    return (
+      <span
+        className="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-700"
+        title="Your bundle payment is awaiting verification."
+      >
+        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-amber-500" />
+        Verifying bundle
+      </span>
+    );
+  }
+  if (state === "rejected") {
+    return (
+      <Link
+        href={href}
+        className="inline-flex items-center gap-1.5 rounded-lg border border-rose-300 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-100"
+        title="Your last bundle payment was rejected — try again."
+      >
+        Bundle rejected — retry
+      </Link>
+    );
+  }
+  return (
+    <Link
+      href={href}
+      className="rounded-lg bg-gradient-to-r from-indigo-600 to-violet-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:from-indigo-700 hover:to-violet-700"
+    >
+      Buy All — 185 BDT
+    </Link>
   );
 }

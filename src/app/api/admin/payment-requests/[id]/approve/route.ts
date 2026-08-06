@@ -20,7 +20,8 @@ import { NextResponse } from "next/server";
 import { FieldValue } from "firebase-admin/firestore";
 import { adminAuth, adminDb } from "@/lib/firebase/admin";
 import { requireAdmin } from "@/lib/auth/admin-guard";
-import { isModuleKey } from "@/lib/config";
+import { isBundleMode } from "@/lib/config";
+import { isBundleRequest } from "@/lib/firebase/payment-types";
 import { MODULE_KEYS, type ModuleKey } from "@/lib/firebase/user-types";
 
 export const dynamic = "force-dynamic";
@@ -51,6 +52,8 @@ export async function POST(
   const preData = preSnap.data() as {
     uid: string;
     module: string;
+    isBundle?: boolean;
+    modules?: string[];
     trxId: string;
     status: string;
   };
@@ -60,11 +63,26 @@ export async function POST(
       { status: 409 }
     );
   }
-  if (!isModuleKey(preData.module)) {
-    return NextResponse.json(
-      { error: `Request has invalid module: ${preData.module}` },
-      { status: 400 }
-    );
+  // Validate the purchase shape: bundle OR a single valid module key.
+  if (preData.isBundle === true) {
+    if (
+      !isBundleMode(preData.module) ||
+      !Array.isArray(preData.modules) ||
+      preData.modules.length === 0 ||
+      !preData.modules.every((m) => MODULE_KEYS.includes(m as ModuleKey))
+    ) {
+      return NextResponse.json(
+        { error: `Request has an invalid bundle shape.` },
+        { status: 400 }
+      );
+    }
+  } else {
+    if (!MODULE_KEYS.includes(preData.module as ModuleKey)) {
+      return NextResponse.json(
+        { error: `Request has invalid module: ${preData.module}` },
+        { status: 400 }
+      );
+    }
   }
 
   // Pre-fetch the requester's Auth record so the create-if-missing path (rare
@@ -84,7 +102,10 @@ export async function POST(
   }
 
   // Result captured from inside the transaction for the ledger write + response.
-  let grantedModule: string | null = null;
+  // Default to empty array (not null) so TS keeps the element type after the
+  // closure assignment inside runTransaction — `let x: T[] | null` + closure
+  // assignment narrows to `null` under control-flow analysis.
+  let grantedModules: ModuleKey[] = [];
   let grantedUid: string | null = null;
 
   try {
@@ -98,6 +119,8 @@ export async function POST(
       const data = snap.data() as {
         uid: string;
         module: string;
+        isBundle?: boolean;
+        modules?: string[];
         trxId: string;
         status: string;
       };
@@ -107,6 +130,14 @@ export async function POST(
           `Request already ${data.status}. Cannot approve.`
         );
       }
+
+      // Resolve the grant targets: all bundle modules, or the single module.
+      // Single-module docs (legacy + new) have no `modules` field → [module].
+      const targets: ModuleKey[] = isBundleRequest(
+        data as { isBundle?: boolean; modules?: ModuleKey[] }
+      )
+        ? (data.modules as ModuleKey[])
+        : [data.module as ModuleKey];
 
       // Idempotency lock — create-only.
       const usedRef = db.doc(`usedTrxIds/${data.trxId}`);
@@ -139,16 +170,20 @@ export async function POST(
         reviewedBy: adminUid,
       });
 
-      // 3. Grant the credit. If the profile doc is missing (only reachable if
-      //    /api/profile/init somehow never ran AND its retries exhausted — now
-      //    a true edge case), create it server-side with real Auth data and
-      //    the granted module already at 1. A verified payment must NEVER be
-      //    lost to a missing profile doc. Admin SDK bypasses rules.
-      const grantedModuleKey = data.module as ModuleKey;
+      // 3. Grant the credit(s). For a bundle this loops over every module in
+      //    `targets` and increments each by 1 within the same atomic txn —
+      //    all-or-nothing. For a single-module request `targets` is a
+      //    one-element array, so this is equivalent to the old single grant.
+      //
+      //    If the profile doc is missing (rare edge case now that
+      //    /api/profile/init is the real fix), create it server-side with
+      //    real Auth data and the granted module(s) already at 1. A verified
+      //    payment must NEVER be lost to a missing profile doc. Admin SDK
+      //    bypasses rules.
       if (!userSnap.exists) {
         const freshCredits = MODULE_KEYS.reduce(
           (acc, k) => {
-            acc[k] = k === grantedModuleKey ? 1 : 0;
+            acc[k] = targets.includes(k) ? 1 : 0;
             return acc;
           },
           {} as Record<ModuleKey, number>
@@ -167,12 +202,16 @@ export async function POST(
           completedAttemptCount: 0,
         });
       } else {
-        txn.update(userRef, {
-          [`credits.${data.module}`]: FieldValue.increment(1),
-        });
+        // Build a single update with one increment per target module so the
+        // whole grant lands in one atomic txn write.
+        const creditUpdates: Record<string, ReturnType<typeof FieldValue.increment>> = {};
+        for (const m of targets) {
+          creditUpdates[`credits.${m}`] = FieldValue.increment(1);
+        }
+        txn.update(userRef, creditUpdates);
       }
 
-      grantedModule = data.module;
+      grantedModules = targets;
       grantedUid = data.uid;
     });
   } catch (err) {
@@ -189,24 +228,28 @@ export async function POST(
     );
   }
 
-  // 4. Best-effort ledger entry (after commit). Audit-only; failure logged.
-  if (grantedUid && grantedModule) {
-    try {
-      await db.collection("credits").add({
-        uid: grantedUid,
-        module: grantedModule,
-        amount: 1,
-        source: "manual-bkash",
-        requestId: id,
-        grantedAt: FieldValue.serverTimestamp(),
-        grantedBy: adminUid,
-      });
-    } catch (err) {
-      // Don't fail the approval — the credit is already granted. Log server-side.
-      console.error(
-        `[approve] Ledger write failed for request ${id} (credit already granted):`,
-        err
-      );
+  // 4. Best-effort ledger entries (after commit). Audit-only; failure logged.
+  //    One entry per granted module — for a bundle that's 4 entries, keeping
+  //    the per-module audit trail honest. The credit is already granted by the
+  //    txn; these writes failing must NOT roll it back.
+  if (grantedUid && grantedModules.length > 0) {
+    for (const m of grantedModules) {
+      try {
+        await db.collection("credits").add({
+          uid: grantedUid,
+          module: m,
+          amount: 1,
+          source: "manual-bkash",
+          requestId: id,
+          grantedAt: FieldValue.serverTimestamp(),
+          grantedBy: adminUid,
+        });
+      } catch (err) {
+        console.error(
+          `[approve] Ledger write failed for request ${id} module ${m} (credit already granted):`,
+          err
+        );
+      }
     }
   }
 

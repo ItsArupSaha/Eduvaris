@@ -1,15 +1,16 @@
 /**
  * Speaking v1 — finalized Speaking diagnostic form.
  *
- * 4 stations, 11 graded transcript items. The app acts as the examiner: for
- * text questions it auto-plays an examiner audio clip (placeholder silent
- * WAVs under /public/audio/speaking/). The Web Speech API runs in the
- * background to capture the transcript for the AI grader (Task 10), but the
+ * 4 stations, 11 graded transcript items. The app acts as the examiner: it
+ * auto-plays teacher audio clips (placeholder silent WAVs under
+ * /public/audio/speaking/) to brief or question the candidate. Student audio
+ * is captured by the MediaRecorder API, uploaded to Firebase Storage in the
+ * background, and transcribed server-side by Whisper on submit — but the
  * transcript is NEVER shown to the student.
  *
  *   1. imageFluency  — 3 images, 15s analysis + up to 60s speak each.
  *   2. rapidFire     — 3 Part 1 audio questions, 30s answer each.
- *   3. cueCard       — 1 Part 2 cue card, 60s prep + full 120s speak (no cut-off).
+ *   3. cueCard       — teacher briefing + 1 Part 2 cue card, 60s prep + full 120s speak (no cut-off).
  *   4. abstractAnswer — 4 Part 3 audio questions, 90s answer each.
  *
  * Overall time: 15 min (900 s).
@@ -100,8 +101,11 @@ export const SPEAKING_V1: SpeakingExam = {
       kind: "cueCard",
       id: "cueCard",
       title: "Station 3 — Narrative Tense Control (Part 2)",
+      // Spoken aloud by the teacher at the start of this station. The on-screen
+      // text mirrors the audio so the written + spoken scripts stay in sync.
+      examinerAudioSrc: "/audio/speaking/cue-instructions.wav",
       instructions:
-        "Read the cue card. You have 1 minute to prepare (silent). Then you must speak for the full 2 minutes — there is no early cut-off.",
+        "Now I'd like you to speak for one to two minutes on a given topic. You have one minute to prepare before you speak. The cue card is on the screen. After your preparation time, you must speak for the full two minutes — there is no early cut-off.",
       questions: [
         {
           id: "q1",
