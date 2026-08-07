@@ -13,16 +13,22 @@
  * "timer ran out" from "page revisited after expiry".
  */
 import { NextResponse } from "next/server";
+import { after } from "next/server";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { adminDb } from "@/lib/firebase/admin";
 import { requireUser } from "@/lib/auth/admin-guard";
 import { gradeExam } from "@/lib/exam/grader";
 import { getExamForm } from "@/lib/exam/exam-forms";
 import { transcribeSpeakingAudios } from "@/lib/exam/whisper";
+import { runDiagnosticPipeline } from "@/lib/ai/grader";
 import type { TestAttempt } from "@/lib/exam/attempt-types";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
+// The HTTP submit itself returns fast; this budget covers the post-response
+// `after()` work (Whisper already ran above; the diagnostic pipeline is the
+// long pole — Examiner + Validator, up to ~2 min combined).
+export const maxDuration = 300;
 
 interface SubmitBody {
   reason?: unknown;
@@ -160,11 +166,33 @@ export async function POST(
       });
     });
 
+    // Schedule the async Deep Diagnostic pipeline. The HTTP response is NOT
+    // blocked — students see their deterministic grade immediately and the
+    // frontend polls diagnosticStatus until "ready" (typically 1–2 min).
+    // Skipped when OPENAI_API_KEY is unset: no diagnosticStatus field is
+    // written and the frontend shows deterministic results only.
+    const aiEnabled = Boolean(process.env.OPENAI_API_KEY);
+    if (aiEnabled) {
+      // Mark pending AFTER the txn so the field only exists once finalize
+      // committed (a failed txn must not leave a dangling pending state).
+      await ref.update({
+        diagnosticStatus: "pending",
+        diagnosticReport: null,
+        diagnosticError: FieldValue.delete(),
+      });
+      after(() => {
+        void runDiagnosticPipeline(id).catch((err) => {
+          console.error(`[submit] diagnostic pipeline crashed for ${id}:`, err);
+        });
+      });
+    }
+
     return NextResponse.json({
       attemptId: id,
       status: finalStatus,
       grade,
       reason,
+      diagnosticStatus: aiEnabled ? "pending" : undefined,
     });
   } catch (err) {
     if (err instanceof TransactionError) {

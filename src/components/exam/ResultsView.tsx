@@ -1,8 +1,12 @@
 "use client";
 
+import { useEffect } from "react";
 import { useExamStore } from "@/store/exam-store";
 import { answerKey } from "@/lib/exam/attempt-types";
 import type { Grade } from "@/lib/exam/attempt-types";
+import type { DiagnosticStatus } from "@/lib/exam/exam-api";
+import type { DiagnosticReport } from "@/lib/ai/diagnostic-schema";
+import { hydrateAttempt } from "@/lib/exam/exam-api";
 import type {
   AnyStation,
   AudioFillStation,
@@ -29,6 +33,7 @@ import type {
  *   - final status (completed vs expired)
  *   - per-station breakdown
  *   - per-question reveal (correct answer vs student's answer, green/red)
+ *   - Deep Diagnostic AI report (polls while pending, renders raw JSON on ready)
  *
  * The exam form comes from the store (resolved by hydrate from the attempt's
  * module), so it matches what the attempt was graded against.
@@ -37,7 +42,12 @@ export function ResultsView({
   result,
   onDone,
 }: {
-  result: { status: string; grade: Grade | null } | null;
+  result: {
+    status: string;
+    grade: Grade | null;
+    diagnosticStatus?: DiagnosticStatus;
+    diagnosticReport?: DiagnosticReport | null;
+  } | null;
   onDone: () => void;
 }) {
   const exam = useExamStore((s) => s.exam);
@@ -152,11 +162,112 @@ export function ResultsView({
           </button>
         </div>
 
+        {/* Deep Diagnostic AI report. Polls the attempt while the pipeline
+            runs in the background; renders raw JSON for now (Task 11 builds
+            the polished Medical Report UI). Absent entirely when the AI
+            pipeline is disabled (no OPENAI_API_KEY). */}
+        <DiagnosticPanel
+          status={result.diagnosticStatus}
+          report={result.diagnosticReport}
+        />
+
         <p className="mt-6 text-center text-xs text-slate-400">
           This is a learning diagnostic, not an official exam score.
         </p>
       </div>
     </main>
+  );
+}
+
+/* --------------------------- Diagnostic panel -------------------------- */
+
+/**
+ * Renders the async Deep Diagnostic. When status is "pending" it polls the
+ * attempt every 5s (reusing the existing GET route) and updates the store
+ * once the report lands. When "ready" it renders the raw JSON so we can
+ * verify the AI output before the polished UI (Task 11) is built.
+ */
+function DiagnosticPanel({
+  status,
+  report,
+}: {
+  status?: DiagnosticStatus;
+  report?: DiagnosticReport | null;
+}) {
+  const attemptId = useExamStore((s) => s.attemptId);
+  const setDiagnostic = useExamStore((s) => s.setDiagnostic);
+
+  // Poll while pending. The interval is cleared on unmount or once a terminal
+  // status arrives. Modeled on the admin queue poller.
+  useEffect(() => {
+    if (status !== "pending" || !attemptId) return;
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const { attempt } = await hydrateAttempt(attemptId);
+        if (cancelled) return;
+        if (attempt.diagnosticStatus === "ready") {
+          setDiagnostic("ready", attempt.diagnosticReport ?? null);
+        } else if (attempt.diagnosticStatus === "error") {
+          setDiagnostic("error", null);
+        }
+        // still pending → the interval keeps ticking.
+      } catch (err) {
+        // Network blips shouldn't kill the poller; the next tick retries.
+        console.warn("[diagnostic] poll failed", err);
+      }
+    };
+    void poll(); // fire immediately, then every 5s.
+    const handle = setInterval(poll, 5000);
+    return () => {
+      cancelled = true;
+      clearInterval(handle);
+    };
+  }, [status, attemptId, setDiagnostic]);
+
+  // No diagnostic field at all → AI pipeline disabled. Render nothing.
+  if (!status) return null;
+
+  if (status === "pending") {
+    return (
+      <div className="mt-8 rounded-2xl border border-indigo-200 bg-indigo-50/60 p-6">
+        <div className="flex items-center gap-3">
+          <span className="h-3 w-3 flex-none animate-pulse rounded-full bg-indigo-500" />
+          <div>
+            <p className="text-sm font-semibold text-indigo-900">
+              Your Deep Diagnostic is being generated.
+            </p>
+            <p className="mt-0.5 text-xs text-indigo-700">
+              This usually takes 1–2 minutes. You can stay on this page or come
+              back later.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (status === "error") {
+    return (
+      <div className="mt-8 rounded-xl border border-slate-200 bg-slate-50 p-4">
+        <p className="text-xs text-slate-500">
+          Deep diagnostic unavailable right now — your results above are still
+          complete. You can try again later.
+        </p>
+      </div>
+    );
+  }
+
+  // ready → raw JSON render for verification. Task 11 replaces this block.
+  return (
+    <div className="mt-8">
+      <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-slate-500">
+        Deep Diagnostic Report (raw)
+      </h2>
+      <pre className="max-h-[32rem] overflow-auto rounded-xl border border-slate-200 bg-slate-900 p-4 text-xs leading-relaxed text-slate-100">
+        {JSON.stringify(report, null, 2)}
+      </pre>
+    </div>
   );
 }
 

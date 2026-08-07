@@ -12,6 +12,7 @@
  */
 import type { ModuleKey } from "@/lib/firebase/user-types";
 import type { TfngVerdict } from "./content-types";
+import type { DiagnosticReport } from "@/lib/ai/diagnostic-schema";
 
 /** Lifecycle of an attempt. */
 export const ATTEMPT_STATUSES = [
@@ -116,6 +117,20 @@ export interface TestAttempt {
    * reading/listening/writing.
    */
   transcripts?: Record<string, string>;
+  /**
+   * Deep Diagnostic AI pipeline state. Separate from the main `status` field
+   * (which stays in-progress → completed|expired) so the existing status guards
+   * are undisturbed.
+   *   - "pending": pipeline scheduled, report not ready yet (frontend polls).
+   *   - "ready":   diagnosticReport is populated.
+   *   - "error":   pipeline failed after retries; frontend falls back gracefully.
+   * Absent when OPENAI_API_KEY is unset (no pipeline run; deterministic grade only).
+   */
+  diagnosticStatus?: "pending" | "ready" | "error";
+  /** The validated Deep Diagnostic Report. Present when diagnosticStatus === "ready". */
+  diagnosticReport?: DiagnosticReport;
+  /** Short reason string when diagnosticStatus === "error". */
+  diagnosticError?: string;
 }
 
 /** The forward-progress fields the PATCH route is allowed to merge. */

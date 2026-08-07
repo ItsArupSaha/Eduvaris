@@ -20,7 +20,8 @@ import {
   type AnswersMap,
 } from "@/lib/exam/attempt-types";
 import { getExamForm } from "@/lib/exam/exam-forms";
-import type { HydratedAttempt } from "@/lib/exam/exam-api";
+import type { HydratedAttempt, DiagnosticStatus } from "@/lib/exam/exam-api";
+import type { DiagnosticReport } from "@/lib/ai/diagnostic-schema";
 
 export type ExamPhase =
   | "loading"
@@ -52,7 +53,13 @@ export interface ExamState {
   lastSavedAt: number | null;
 
   // result (filled on submit)
-  result: { status: string; grade: HydratedAttempt["grade"] } | null;
+  result: {
+    status: string;
+    grade: HydratedAttempt["grade"];
+    // Deep Diagnostic pipeline (absent when OPENAI_API_KEY is unset).
+    diagnosticStatus?: DiagnosticStatus;
+    diagnosticReport?: DiagnosticReport | null;
+  } | null;
 
   /* ----------------------------- actions ----------------------------- */
   hydrate: (attempt: HydratedAttempt, resumed: boolean) => void;
@@ -130,7 +137,16 @@ export interface ExamState {
   setSaveStatus: (s: "idle" | "saving" | "saved" | "error") => void;
 
   beginSubmit: () => void;
-  finishSubmit: (status: string, grade: HydratedAttempt["grade"]) => void;
+  finishSubmit: (
+    status: string,
+    grade: HydratedAttempt["grade"],
+    diagnosticStatus?: DiagnosticStatus
+  ) => void;
+  /** Patch diagnostic fields onto an existing result (called by the poller). */
+  setDiagnostic: (
+    status: DiagnosticStatus,
+    report?: DiagnosticReport | null
+  ) => void;
 
   reset: () => void;
 }
@@ -388,8 +404,18 @@ export const useExamStore = create<ExamState>((set, get) => ({
 
   beginSubmit: () => set({ phase: "submitting" }),
 
-  finishSubmit: (status, grade) =>
-    set({ phase: "completed", result: { status, grade } }),
+  finishSubmit: (status, grade, diagnosticStatus) =>
+    set({
+      phase: "completed",
+      result: { status, grade, diagnosticStatus },
+    }),
+
+  setDiagnostic: (diagnosticStatus, diagnosticReport) =>
+    set((s) => ({
+      result: s.result
+        ? { ...s.result, diagnosticStatus, diagnosticReport }
+        : s.result,
+    })),
 
   reset: () =>
     set({

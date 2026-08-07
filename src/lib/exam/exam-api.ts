@@ -11,6 +11,10 @@ import type {
   AttemptStatus,
   Grade,
 } from "./attempt-types";
+import type { DiagnosticReport } from "@/lib/ai/diagnostic-schema";
+
+/** Diagnostic pipeline status (see TestAttempt.diagnosticStatus). */
+export type DiagnosticStatus = "pending" | "ready" | "error";
 
 async function getIdToken(): Promise<string> {
   const user = firebaseAuth().currentUser;
@@ -73,6 +77,10 @@ export interface HydratedAttempt {
   tabSwitchCount: number;
   expiresAtMs: number | null;
   grade: Grade | null;
+  // Deep Diagnostic pipeline fields (absent when OPENAI_API_KEY is unset).
+  diagnosticStatus?: DiagnosticStatus;
+  diagnosticReport?: DiagnosticReport | null;
+  diagnosticError?: string;
 }
 
 export function hydrateAttempt(id: string): Promise<{ attempt: HydratedAttempt }> {
@@ -102,6 +110,8 @@ export interface SubmitResponse {
   grade: Grade | null;
   reason: string;
   alreadyFinalized?: boolean;
+  /** Present ("pending") when the diagnostic pipeline was scheduled. */
+  diagnosticStatus?: DiagnosticStatus;
 }
 
 export function submitAttempt(

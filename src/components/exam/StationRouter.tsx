@@ -81,7 +81,7 @@ export function StationRouter({
           tabSwitchCount,
         });
         const res = await submitAttempt(attemptId, "user-submit");
-        finishSubmit(res.status, res.grade);
+        finishSubmit(res.status, res.grade, res.diagnosticStatus);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Submit failed.");
       }

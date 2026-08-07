@@ -74,7 +74,11 @@ export default function ExamPage({
         // Already finalized → drop into results.
         if (attempt.status !== "in-progress") {
           console.info("[exam] attempt already finalized → results");
-          finishSubmit(attempt.status, attempt.grade);
+          finishSubmit(
+            attempt.status,
+            attempt.grade,
+            attempt.diagnosticStatus
+          );
           return;
         }
 
@@ -94,7 +98,7 @@ export default function ExamPage({
             const res = await submitAttempt(attemptId, "revisit-expired");
             if (!cancelled) {
               console.info("[exam] revisit-expired submit done", res.status);
-              finishSubmit(res.status, res.grade);
+              finishSubmit(res.status, res.grade, res.diagnosticStatus);
             }
           } catch (err) {
             console.error("[exam] revisit-expired submit FAILED", err);
@@ -145,7 +149,7 @@ export default function ExamPage({
     void submitAttempt(attemptId, "timer-expired")
       .then((res) => {
         console.info("[exam] auto-submit done", res.status);
-        finishSubmit(res.status, res.grade);
+        finishSubmit(res.status, res.grade, res.diagnosticStatus);
       })
       .catch((err) => {
         console.error("[exam] auto-submit FAILED", err);
